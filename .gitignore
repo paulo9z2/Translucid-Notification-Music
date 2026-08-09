@@ -1,0 +1,16 @@
+# Build outputs
+bin/
+obj/
+dist/
+out/
+
+# Visual Studio / VS Code
+.vs/
+*.user
+*.suo
+.idea/
+
+# User / temp
+*.bak
+*.tmp
+PublishOutputs.*
