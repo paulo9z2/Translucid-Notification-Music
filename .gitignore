@@ -3,6 +3,7 @@ bin/
 obj/
 dist/
 out/
+Publish/
 
 # Visual Studio / VS Code
 .vs/
