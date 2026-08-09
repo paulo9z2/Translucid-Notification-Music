@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.ComponentModel;
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -38,6 +39,7 @@ public partial class MainWindow : Window
         _tick.Tick += (_, _) => RenderPosition();
         SizeChanged += (_, _) => RenderPosition();
         Closing += (_, _) => SaveSettings();
+        Closing += Window_Closing;
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -68,8 +70,8 @@ public partial class MainWindow : Window
         DesktopFx.TryCornerRounding(hwnd);
         if (!DesktopFx.EnableAcrylic(hwnd))
         {
-            Shell.Background = new SolidColorBrush(Color.FromArgb(0xCC, 0x0A, 0x0B, 0x0D));
-            CoverFrame.Background = new SolidColorBrush(Color.FromArgb(0x33, 0x00, 0x00, 0x00));
+            Shell.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xCC, 0x0A, 0x0B, 0x0D));
+            CoverFrame.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x33, 0x00, 0x00, 0x00));
         }
         DesktopFx.HideFromAltTab(hwnd);
         DesktopFx.RoundCorners(hwnd, 14);
@@ -156,7 +158,7 @@ public partial class MainWindow : Window
         }
 
         if (e.OriginalSource is DependencyObject { } source &&
-            FindAncestor<Button>(source) is not null)
+            FindAncestor<System.Windows.Controls.Button>(source) is not null)
         {
             return;
         }
@@ -176,9 +178,9 @@ public partial class MainWindow : Window
         LockIcon.Text = _locked ? "\uE72E" : "\uE785";
         LockIcon.Opacity = _locked ? 0.35 : 1.0;
         Shell.BorderBrush = new SolidColorBrush(_locked
-            ? Color.FromArgb(0x2E, 0xFF, 0xFF, 0xFF)
-            : Color.FromArgb(0xFF, 0x6F, 0xD3, 0xFF));
-        Cursor = _locked ? Cursors.Arrow : Cursors.SizeAll;
+            ? System.Windows.Media.Color.FromArgb(0x2E, 0xFF, 0xFF, 0xFF)
+            : System.Windows.Media.Color.FromArgb(0xFF, 0x6F, 0xD3, 0xFF));
+        Cursor = _locked ? System.Windows.Input.Cursors.Arrow : System.Windows.Input.Cursors.SizeAll;
     }
 
     private void SaveSettings()
@@ -245,7 +247,17 @@ public partial class MainWindow : Window
 
     private void CloseButton_Click(object sender, MouseButtonEventArgs e)
     {
-        _tracker.Dispose();
         Close();
+    }
+
+    private void Window_Closing(object sender, CancelEventArgs e)
+    {
+        var app = (App)System.Windows.Application.Current;
+        if (!app.IsQuitting)
+        {
+            e.Cancel = true;
+            Hide();
+            app.NotifyHidden();
+        }
     }
 }

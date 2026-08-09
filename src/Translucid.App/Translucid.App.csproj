@@ -4,12 +4,18 @@
     <ProjectReference Include="..\Translucid.Core\Translucid.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="app.ico" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <AssemblyName>Translucid</AssemblyName>
     <RootNamespace>Translucid.App</RootNamespace>
   </PropertyGroup>
