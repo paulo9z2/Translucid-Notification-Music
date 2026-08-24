@@ -7,6 +7,8 @@ namespace Translucid.App;
 /// </summary>
 public partial class App : System.Windows.Application
 {
+    /// <summary>Versão atual; comparada com a tag do último release no GitHub.</summary>
+    public const string CurrentVersion = "1.2.0";
     public App()
     {
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -17,6 +19,17 @@ public partial class App : System.Windows.Application
 
     /// <summary>True quando o usuario realmente quer sair (menu "Sair" da bandeja).</summary>
     public bool IsQuitting { get; private set; }
+
+    /// <summary>Sai de verdade para o .cmd de auto-atualização trocar os arquivos.</summary>
+    public void QuitForUpdate()
+    {
+        IsQuitting = true;
+        Dispatcher.Invoke(() =>
+        {
+            MainWindow?.Close();
+            Shutdown();
+        });
+    }
 
     protected override void OnStartup(StartupEventArgs e)
     {

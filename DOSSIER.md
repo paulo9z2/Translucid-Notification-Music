@@ -446,3 +446,16 @@ musik-plasmoid (KDE), kil0bit-system-monitor (Win11), WinState, GlintBar.
     (imune a transformações/recorte da janela), alvo limitado por
     `ExtentHeight − ViewportHeight`, e animação via `CompositionTarget.Rendering`
     (easeOutCubic manual) em vez de animar `VerticalOffset`.
+13. **Auto-atualização (botão "update")** — novo `UpdateChecker` (Core) consulta
+    `api.github.com/.../releases/latest` e compara a tag com
+    `App.CurrentVersion` (comparação numérica por parte, não string). Havendo
+    release novo, um **pill azul "update vX.Y.Z"** aparece no canto superior
+    direito da área dos botões, flutuando ligeiramente acima do botão ⏭
+    (`Margin 0,-33,2,0`), com glow azul (#5CB8FF, o mesmo da barra de progresso).
+    Ao clicar: baixa `Translucid.zip` + `.sha256` do release para
+    `%TEMP%\Translucid_Update_<guid>`, valida o checksum, extrai e gera um
+    `Translucid_Update.cmd` (método KitLugia) que espera o PID do widget morrer,
+    faz `xcopy /E /Y /Q /I` da pasta extraída para a pasta de instalação,
+    relança o exe e apaga a temporária. O widget sai de verdade via
+    `App.QuitForUpdate()` (bypassa o fechar-para-bandeja). Falha de download/
+    extração restaura o pill para nova tentativa.

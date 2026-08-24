@@ -103,6 +103,55 @@ public partial class MainWindow : Window
         _tracker.Updated += OnMediaUpdated;
         await _tracker.StartAsync();
         _tick.Start();
+        _ = CheckForUpdatesAsync();
+    }
+
+    // ------------------------------------------------------------- update
+
+    private UpdateChecker.UpdateInfo? _update;
+
+    /// <summary>Verifica o GitHub em background; se houver release novo, mostra o pill azul.</summary>
+    private async Task CheckForUpdatesAsync()
+    {
+        var info = await UpdateChecker.CheckAsync(App.CurrentVersion).ConfigureAwait(true);
+        if (info is null)
+        {
+            return;
+        }
+
+        await Dispatcher.InvokeAsync(() =>
+        {
+            _update = info;
+            UpdateButton.Visibility = Visibility.Visible;
+            UpdateButton.Content = $"update {info.Tag}";
+        });
+    }
+
+    private async void UpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_update is not { } info)
+        {
+            return;
+        }
+
+        UpdateButton.Visibility = Visibility.Collapsed;
+        UpdateStatusText.Text = "baixando…";
+        UpdateStatusText.Visibility = Visibility.Visible;
+
+        try
+        {
+            await Task.Run(() => UpdateInstaller.InstallAsync(info)).ConfigureAwait(true);
+
+            // O .cmd de troca já foi lançado e está esperando este processo
+            // morrer. Sai de verdade (não vai para a bandeja).
+            ((App)Application.Current).QuitForUpdate();
+        }
+        catch
+        {
+            // Falhou o download/extração: restaura o pill para tentar de novo.
+            UpdateStatusText.Visibility = Visibility.Collapsed;
+            UpdateButton.Visibility = Visibility.Visible;
+        }
     }
 
     private void PositionWindow()

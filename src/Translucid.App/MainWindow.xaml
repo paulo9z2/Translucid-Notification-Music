@@ -116,6 +116,49 @@
                                 Content="&#xE768;" Width="40" Height="40" FontSize="15" Click="PlayButton_Click"/>
                         <Button x:Name="NextButton" Grid.Column="2" Style="{StaticResource MediaButton}"
                                 Content="&#xE893;" HorizontalAlignment="Right" Click="NextButton_Click"/>
+
+                        <!-- Botão UPDATE: pill azul flutuando ligeiramente acima do ⏭ -->
+                        <Button x:Name="UpdateButton" Grid.Column="2"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,-33,2,0" Height="23" Padding="12,0"
+                                Content="update" FontSize="11.5" FontWeight="SemiBold"
+                                Foreground="#FFFFFFFF" Cursor="Hand" Visibility="Collapsed"
+                                ToolTip="Nova versão disponível — clique para atualizar"
+                                Click="UpdateButton_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Bd" Background="#5CB8FF" CornerRadius="11.5"
+                                            BorderBrush="#80FFFFFF" BorderThickness="1">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="#5CB8FF" BlurRadius="10"
+                                                              ShadowDepth="0" Opacity="0.65"/>
+                                        </Border.Effect>
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Margin="{TemplateBinding Padding}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="#7BCBFF"/>
+                                            <Setter TargetName="Bd" Property="Effect">
+                                                <Setter.Value>
+                                                    <DropShadowEffect Color="#5CB8FF" BlurRadius="14"
+                                                                      ShadowDepth="0" Opacity="0.9"/>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="#3D9BE0"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- Estado "atualizando…" no lugar do pill -->
+                        <TextBlock x:Name="UpdateStatusText" Grid.Column="2" Text="" FontSize="10.5"
+                                   Foreground="#CCFFFFFF" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                   Margin="0,-30,4,0" Visibility="Collapsed" IsHitTestVisible="False"/>
                     </Grid>
                 </Grid>
 
