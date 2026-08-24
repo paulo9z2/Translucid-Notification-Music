@@ -144,8 +144,7 @@ translucid windows/
 ├── Translucid.slnx                      # solução (.NET 9)
 ├── dist/Translucid/                     # saída publicada (com DLLs + exe)
 ├── scripts/
-│   ├── setup-terminal.ps1               # perfil Translucid no Windows Terminal
-│   └── make-icon.ps1                    # gera app.ico a partir de PNG
+│   └── build-deploy.cs                  # deploy 100% C# (dotnet run --file)
 └── src/
     ├── Translucid.Core/                 # lógica independente de UI
     └── Translucid.App/                  # WPF: janelas, bandeja, animações
@@ -243,8 +242,7 @@ Sessão SMTC (Spotify, Chrome...)
 | `src/Translucid.App/SettingsWindow.xaml(.cs)` | Janela de preferências | XAML/WPF |
 | `src/Translucid.App/App.xaml.cs` | Bandeja + ciclo de vida | `NotifyIcon` (WinForms), `ContextMenuStrip` |
 | `src/Translucid.App/AssemblyInfo.cs` | Meta do tema WPF | — |
-| `scripts/setup-terminal.ps1` | Perfil Translucid no Windows Terminal | PowerShell + JSON |
-| `scripts/make-icon.ps1` | Gera `app.ico` multi-tamanho | PowerShell + System.Drawing |
+| `scripts/build-deploy.cs` | Deploy: publish + zip + sha256, 100% C# | `dotnet run --file` (C# puro) |
 
 ### Pacotes NuGet
 - **NAudio 2.2.1** (Translucid.Core) — apenas `CoreAudioApi` (sessões de áudio).
@@ -275,36 +273,40 @@ padrões).
 
 ## 6. Scripts
 
-### `scripts/setup-terminal.ps1`
-Injeta no **Windows Terminal** um perfil translúcido estilo "Arch":
-- Perfil `Translucid (Arch)` (`powershell.exe`, Acrylic 65%, fonte Cascadia Mono 11,
-  cursor underscore, padding 8).
-- Esquema de cores **Catppuccin Mocha** (fundo #1E1E2E, texto #CDD6F4 etc.).
-- Define o perfil como padrão. Faz **backup** do `settings.json` em `.bak`.
-- OBS.: as linhas 75 use `$profiles` — variável inexistente (a intenção era
-  `$list`). **Bom para correção futura** (o perfil ainda é adicionado porque
-  `$profiles` é `$null` e o `@(...)` + `$null` não apaga a lista, mas está
-  logicamente errado).
+### `scripts/build-deploy.cs`
+Deploy 100% C#, executado com `dotnet run --file scripts/build-deploy.cs -- <versao>`
+(sem qualquer dependência de PowerShell). Faz:
+1. `dotnet publish` single-file self-contained com `-p:Version=<versao>`;
+2. Monta `Publish/Translucid.zip` (exe + DLLs nativas `_cor3` do WPF que o
+   single-file não embute + README);
+3. Gera `Translucid.zip.sha256`.
 
-### `scripts/make-icon.ps1`
-Converte uma PNG em `app.ico` multi-tamanho (16–256, PNG embutido) usando
-System.Drawing; centraliza a imagem no canvas com alta qualidade.
+O orquestrador é o `deploy.bat <versao>`: chama o script acima e cria a
+release no GitHub (`gh release create --generate-notes`), commita, empurra
+main e a tag.
 
+---
 ---
 
 ## 7. Como compilar e publicar
 
 Pré-requisitos: SDK .NET 9+ (o ambiente atual roda .NET 10 preview).
 
-```powershell
-# Publicar + montar pacote organizado + instalar na pasta de uso (recomendado)
-powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
+```bash
+# Deploy completo (build + zip + release no GitHub + tag):
+deploy.bat 1.4.0
+
+# Ou só o pacote local (publish + zip + sha256), 100% C#:
+dotnet run --file scripts/build-deploy.cs -- 1.4.0
 
 # Ou manualmente, passo a passo:
 dotnet build Translucid.slnx -c Release
-dotnet publish src\Translucid.App -c Release -r win-x64 -o dist\Translucid
-# depois copiar dist\Translucid\* para o local de uso
+dotnet publish src/Translucid.App -c Release -r win-x64 --self-contained true \
+  -p:PublishSingleFile=true -p:Version=1.4.0 -o dist/Translucid
 ```
+
+> Importante: a versão vai no `-p:Version` do publish — o updater lê a versão
+> do assembly; esquecer de setar faz o pill de update reaparecer para sempre.
 
 O script `scripts\deploy.ps1` faz tudo: publica, move as DLLs para a subpasta
 `lib\`, ajusta `deps.json` e `runtimeconfig.json` (probing path) e instala no
@@ -365,7 +367,7 @@ subpasta `lib\`.
   Win10/11); sem ele, fundo sólido translúcido.
 - **LRCLIB**: exige internet; músicas sem LRC na base mostram a mensagem de
   ausência. Há cache em memória por faixa (não persiste entre sessões).
-- `Class1.cs` morto; `setup-terminal.ps1` tem a variável `$profiles` trocada.
+- `Class1.cs` morto.
 - `MainWindow` tem aviso de nullability CS8622 no handler `Window_Closing`
   (harmless).
 - Não há multi-monitor por tela (a posição salva é absoluta em coordenadas de

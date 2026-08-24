@@ -1,83 +1,44 @@
 @echo off
-chcp 65001 >nul
-setlocal EnableDelayedExpansion
+rem deploy.bat — orquestra o deploy 100% sem PowerShell.
+rem Uso: deploy.bat [versao]   (ex.: deploy.bat 1.4.0)
+setlocal
 cd /d "%~dp0"
 
-:: Garante git e gh no PATH
-if exist "C:\Program Files\Git\cmd\git.exe" set "PATH=C:\Program Files\Git\cmd;C:\Program Files\Git\bin;%PATH%"
-if exist "C:\Program Files\GitHub CLI\gh.exe" set "PATH=C:\Program Files\GitHub CLI;%PATH%"
-
-set "REPO=paulo9z2/Translucid-Notification-Music"
-
-echo ===== Translucid Notification Music Deploy =====
-
-:: Versao (Enter = ultima + 1)
-set "LATEST="
-for /f "tokens=*" %%a in ('gh release list --repo %REPO% --limit 1 --json tagName --jq ".[0].tagName" 2^>nul') do set "LATEST=%%a"
-set /p VERSION="Digite a versao (Enter = %LATEST% +1, ex: 1.0.3): "
-
-if "%VERSION%"=="" (
-    if "%LATEST%"=="" (
-        set "VERSION=1.0.0"
-    ) else (
-        for /f "tokens=1,2,3 delims=v." %%a in ("%LATEST%") do (
-            set /a "BUILD=%%c+1"
-            set "VERSION=%%a.%%b.!BUILD!"
-        )
-    )
-    echo Usando versao: %VERSION%  (ultima: %LATEST%)
+if "%~1"=="" (
+    echo Uso: deploy.bat ^<versao^>    ex.: deploy.bat 1.4.0
+    exit /b 1
 )
-if "%VERSION%"=="" set "VERSION=1.0.0"
-echo Versao final: %VERSION%
 
-:: Verifica gh auth
-echo.
-echo [0/5] Verificando autenticacao...
-gh auth status >nul 2>&1
-if %errorlevel% neq 0 (
-    echo gh nao autenticado. Iniciando login...
-    gh auth login -h github.com -w
-    if %errorlevel% neq 0 (
-        echo ERRO: falha no gh auth. Tente: gh auth login -h github.com -w
-        pause
+echo ===== Translucid %~1 — Deploy =====
+
+echo [1/4] Build + ZIP + SHA256...
+dotnet run --file scripts\build-deploy.cs -- %~1
+if errorlevel 1 (
+    echo ERRO no build-deploy
+    exit /b 1
+)
+
+echo [2/4] Release v%~1...
+gh release create "v%~1" --title "Translucid v%~1" --generate-notes "Publish\Translucid.zip" "Publish\Translucid.zip.sha256"
+if errorlevel 1 (
+    echo   release ja existe - apagando e recriando...
+    gh release delete "v%~1" --yes
+    gh release create "v%~1" --title "Translucid v%~1" --generate-notes "Publish\Translucid.zip" "Publish\Translucid.zip.sha256"
+    if errorlevel 1 (
+        echo AVISO: crie manualmente em https://github.com/paulo9z2/Translucid-Notification-Music/releases/new?tag=v%~1
         exit /b 1
     )
 )
 
-echo.
-echo [1/5] Build + ZIP + SHA256 (versao %VERSION%)...
-powershell -ExecutionPolicy Bypass -File "Deploy.ps1" -Version "%VERSION%"
-if %errorlevel% neq 0 (
-    echo ERRO no Deploy.ps1
-    pause
-    exit /b 1
-)
+echo [3/4] Git commit + push...
+git add -A src DOSSIER.md
+git commit -m "Deploy v%~1" --allow-empty
+git push origin main
+
+echo [4/4] Tag v%~1...
+git tag -f "v%~1"
+git push origin "v%~1" --force
 
 echo.
-echo [2/5] Criando/atualizando release v%VERSION%...
-gh release create "v%VERSION%" --repo %REPO% --title "Translucid v%VERSION%" --notes "Release automatica v%VERSION%" "Publish/Translucid.zip" "Publish/Translucid.zip.sha256" 2>nul
-if %errorlevel% neq 0 (
-    echo   release ja existe p/ v%VERSION% - apagando e recriando...
-    gh release delete "v%VERSION%" --repo %REPO% --yes >nul 2>&1
-    gh release create "v%VERSION%" --repo %REPO% --title "Translucid v%VERSION%" --notes "Release automatica v%VERSION%" "Publish/Translucid.zip" "Publish/Translucid.zip.sha256"
-    if %errorlevel% neq 0 (
-        echo AVISO: release/upload falhou. Faca manualmente em:
-        echo   https://github.com/%REPO%/releases/new?tag=v%VERSION%
-    )
-)
-
-echo.
-echo [3/5] Git add + commit + push...
-git add -A
-git commit -m "Deploy v%VERSION%" 2>nul
-git push >nul 2>&1
-
-echo.
-echo [4/5] Tag v%VERSION%...
-git tag -f "v%VERSION%"
-git push origin "v%VERSION%" --force >nul 2>&1
-
-echo.
-echo ===== Pronto! Translucid v%VERSION% publicado =====
-echo   https://github.com/%REPO%/releases/tag/v%VERSION%
-pause
+echo ===== Pronto! Translucid v%~1 publicado =====
+echo https://github.com/paulo9z2/Translucid-Notification-Music/releases/tag/v%~1

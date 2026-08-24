@@ -4,8 +4,10 @@ Widget interativo de música + desktop translúcido estilo **Arch Linux / KDE Pl
 
 ## Funcionalidades
 - **Widget de música transparente** com blur real (SMTC) — lê o que está tocando no YouTube Music, Spotify, apps nativos, etc.
-- **Terminal translúcido** estilo Arch via perfil do Windows Terminal.
-- Widget movível / bloqueável (clique direito trava/desbloqueia).
+- **Letras sincronizadas** (LRCLIB) com destaque estilo Spicy Lyrics — clique numa linha para pular a música para aquele momento.
+- **Fundo degradê na cor da capa**, transição de capa animada, volume por aplicativo no scroll.
+- **Auto-atualização**: pill azul "update" aparece quando há release novo; um clique reinstala sozinho.
+- Widget movível / bloqueável (clique direito trava/desbloqueia), minimiza para a bandeja.
 - Bordas arredondadas nativas.
 
 ## Rodar o projeto
@@ -13,16 +15,13 @@ Widget interativo de música + desktop translúcido estilo **Arch Linux / KDE Pl
 dotnet run --project src/Translucid.App
 ```
 
-## Publicar .exe completo
+## Deploy (100% C#, sem PowerShell)
 ```bash
-dotnet publish src/Translucid.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
-```
-
-## Configurar terminal
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/setup-terminal.ps1
+dotnet run --file scripts/build-deploy.cs -- 1.4.0   # build + zip + sha256
+deploy.bat 1.4.0                                      # acima + release no GitHub + tag
 ```
 
 ## Notas
 - A música é capturada via `Windows.Media.Control` (SMTC) — funciona com qualquer player que registre mídia no sistema.
-- O terminal usa o perfil `Translucid (Arch)` (Catppuccin Mocha + Acrylic).
+- As letras vêm da API pública [LRCLIB](https://lrclib.net).
+- Configurações em `%LOCALAPPDATA%\Translucid\ui.json`; autostart em `HKCU\...\Run`.
