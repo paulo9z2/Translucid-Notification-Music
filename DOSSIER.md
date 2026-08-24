@@ -459,3 +459,12 @@ musik-plasmoid (KDE), kil0bit-system-monitor (Win11), WinState, GlintBar.
     relança o exe e apaga a temporária. O widget sai de verdade via
     `App.QuitForUpdate()` (bypassa o fechar-para-bandeja). Falha de download/
     extração restaura o pill para nova tentativa.
+14. **Seek pelas letras** — clicar numa linha do painel pula a música para o
+    instante dela no LRC. `MediaTracker.SeekAsync` valida
+    `IsPlaybackPositionEnabled` e chama `TryChangePlaybackPositionAsync`
+    (ticks); o clique recupera o tempo via `DataContext` da linha, reposiciona
+    o relógio local (`_positionAtStamp`/`_positionStamp`) para a UI não contar
+    do lugar antigo até o próximo evento SMTC e força `SyncLyrics()`. Se o app
+    de origem negar o seek, o painel pisca em opacidade como feedback. Cursor
+    vira mão sobre as linhas. Versão do app agora lida do assembly
+    (`-p:Version`), não mais de constante hardcodada.

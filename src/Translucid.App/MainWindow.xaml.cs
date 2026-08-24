@@ -659,6 +659,52 @@ public partial class MainWindow : Window
             _scrollFrom + (_scrollTo - _scrollFrom) * k);
     }
 
+    // ------------------------------------------------- seek pelas letras
+
+    /// <summary>Clique numa linha: pula a música para o tempo dela no LRC.</summary>
+    private async void LyricLine_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not TextBlock { DataContext: string lineText } ||
+            _lyrics is not { Length: > 0 } lines)
+        {
+            return;
+        }
+
+        // O ItemsControl binda só o TEXTO da linha; recupera o instante
+        // procurando a primeira linha com esse texto (LRC raramente repete
+        // linhas em tempos diferentes, e repetir pula pro primeiro jeito — ok).
+        var index = Array.FindIndex(lines, l => l.Text == lineText);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var accepted = await _tracker.SeekAsync(lines[index].Time).ConfigureAwait(true);
+        if (!accepted)
+        {
+            FlashLyricsSeekDenied();
+            return;
+        }
+
+        // Seek aceito: reposiciona o relógio local na hora pedida para a UI
+        // não continuar contando do lugar antigo até o próximo evento SMTC.
+        _positionAtStamp = lines[index].Time;
+        _positionStamp = DateTime.UtcNow;
+        RenderPosition();
+        SyncLyrics();
+    }
+
+    /// <summary>Pisca o painel em vermelho quando o app de origem nega o seek.</summary>
+    private void FlashLyricsSeekDenied()
+    {
+        var anim = new DoubleAnimation(0.35, TimeSpan.FromMilliseconds(120))
+        {
+            AutoReverse = true,
+            RepeatBehavior = new RepeatBehavior(2),
+        };
+        LyricsScroll.BeginAnimation(UIElement.OpacityProperty, anim, HandoffBehavior.SnapshotAndReplace);
+    }
+
     /// <summary>Efeito spicy-lyrics: ativa em destaque, passadas apagadas, futuras visíveis.</summary>
     private void StyleLyricsLines(LyricLine[] lines, int active)
     {

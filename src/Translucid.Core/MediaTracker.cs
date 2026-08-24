@@ -219,6 +219,23 @@ public sealed class MediaTracker : IDisposable
         await PushAsync();
     }
 
+    /// <summary>
+    /// Pula a mídia para o instante indicado. Requer que o app de origem
+    /// aceite controle de posição (IsPlaybackPositionEnabled); retorna true
+    /// se o pedido foi aceito.
+    /// </summary>
+    public async Task<bool> SeekAsync(TimeSpan position)
+    {
+        if (_session is null || !_session.GetPlaybackInfo().Controls.IsPlaybackPositionEnabled)
+        {
+            return false;
+        }
+
+        var accepted = await _session.TryChangePlaybackPositionAsync(position.Ticks);
+        await PushAsync();
+        return accepted;
+    }
+
     public void Dispose()
     {
         if (_manager is not null)
