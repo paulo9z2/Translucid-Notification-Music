@@ -66,8 +66,10 @@ public static class UpdateInstaller
     }
 
     /// <summary>
-    /// Gera e dispara o script de troca: espera este processo sair, copia os
-    /// arquivos novos por cima e relança o app.
+    /// Gera e dispara o script de troca: espera este processo sair, LIMPA os
+    /// arquivos da instalação antiga (o publish pode mudar de layout entre
+    /// versões — p.ex. framework-dependent → single-file — e arquivos velhos
+    /// ao lado do novo exe quebram a carga), copia os novos e relança o app.
     /// </summary>
     private static void LaunchSwapScript(string sourceDir, string runningExe, string workDir)
     {
@@ -75,8 +77,10 @@ public static class UpdateInstaller
         var installDir = Path.GetDirectoryName(runningExe)!;
         var cmdPath = Path.Combine(workDir, "Translucid_Update.cmd");
 
-        // xcopy /Y sobrescreve; /E desce subpastas (lib\); /Q silencioso.
-        // rd no final apaga a área de trabalho temporária desta atualização.
+        // del: remove resíduos de layouts anteriores (deps.json, runtimeconfig,
+        // Translucid.dll, lib\) que conflitam com o single-file novo. 2>nul:
+        // não falha quando o arquivo não existe (instalação já era single-file).
+        // xcopy /Y sobrescreve; /E desce subpastas; /Q silencioso.
         var script = $"""
 @echo off
 title Translucid - Atualizando...
@@ -88,6 +92,11 @@ if not errorlevel 1 (
     timeout /t 1 /nobreak >nul
     goto wait
 )
+echo Removendo arquivos antigos...
+del /q "{installDir}\Translucid.dll" 2>nul
+del /q "{installDir}\Translucid.deps.json" 2>nul
+del /q "{installDir}\Translucid.runtimeconfig.json" 2>nul
+rd /s /q "{installDir}\lib" 2>nul
 echo Instalando nova versao...
 xcopy "{sourceDir}" "{installDir}" /E /Y /Q /I
 if errorlevel 1 (
