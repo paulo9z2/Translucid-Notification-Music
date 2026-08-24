@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Tooling roda em .NET puro, sem Windows SDK targeting pack -->
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>Translucid.Tools</RootNamespace>
+    <AssemblyName>translucid-deploy</AssemblyName>
+  </PropertyGroup>
+
+</Project>

@@ -142,12 +142,15 @@ Dois projetos .NET resolvidos pelo `Translucid.slnx`
 ```
 translucid windows/
 ├── Translucid.slnx                      # solução (.NET 9)
-├── dist/Translucid/                     # saída publicada (com DLLs + exe)
-├── scripts/
-│   └── build-deploy.cs                  # deploy 100% C# (dotnet run --file)
+├── Directory.Build.props                # propriedades compartilhadas (TFM, nullable, Version)
+├── Directory.Packages.props             # Central Package Management (versões NuGet)
+├── deploy.bat                           # atalho: dotnet run --project src/Translucid.Deploy
+├── dist/Translucid/                     # saída do publish (exe único)
+├── Publish/                             # Translucid.zip + .sha256 (artefato de release)
 └── src/
     ├── Translucid.Core/                 # lógica independente de UI
-    └── Translucid.App/                  # WPF: janelas, bandeja, animações
+    ├── Translucid.App/                  # WPF: janelas, bandeja, animações
+    └── Translucid.Deploy/               # tooling de release 100% C#
 ```
 
 ### 3.1 Translucid.Core (biblioteca)
@@ -273,18 +276,23 @@ padrões).
 
 ## 6. Scripts
 
-### `scripts/build-deploy.cs`
-Deploy 100% C#, executado com `dotnet run --file scripts/build-deploy.cs -- <versao>`
-(sem qualquer dependência de PowerShell). Faz:
-1. `dotnet publish` single-file self-contained com `-p:Version=<versao>`;
-2. Monta `Publish/Translucid.zip` (exe + DLLs nativas `_cor3` do WPF que o
-   single-file não embute + README);
-3. Gera `Translucid.zip.sha256`.
+### `src/Translucid.Deploy` (projeto da solução)
+Tooling de release 100% C# — sem PowerShell, sem scripts soltos:
 
-O orquestrador é o `deploy.bat <versao>`: chama o script acima e cria a
-release no GitHub (`gh release create --generate-notes`), commita, empurra
-main e a tag.
+```bash
+dotnet run --project src/Translucid.Deploy -c Release -- 1.4.0             # build + zip + sha256
+dotnet run --project src/Translucid.Deploy -c Release -- 1.4.0 --release   # + release GitHub + tag
+deploy.bat 1.4.0 --release                                                 # atalho equivalente
+```
 
+Etapas: publish single-file (`-p:Version`), zip em `Publish/`
+(exe + README; as DLLs nativas `_cor3` vão EMBUTIDAS no exe via
+`IncludeNativeLibrariesForSelfExtract=true`) e SHA-256. Com `--release`,
+usa a CLI `gh` para criar a release, commitar e empurrar main+tag.
+Processos são iniciados com `ProcessStartInfo.ArgumentList` (quoting correto
+mesmo com espaços no caminho).
+
+---
 ---
 ---
 

@@ -1,0 +1,12 @@
+<Project>
+
+  <!-- Central Package Management: versões de NuGet num lugar só -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="NAudio" Version="2.2.1" />
+  </ItemGroup>
+
+</Project>

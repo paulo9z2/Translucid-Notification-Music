@@ -1,0 +1,15 @@
+<Project>
+
+  <!-- Propriedades compartilhadas por todos os projetos da solução -->
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Versão padrão; o publish de release sobrepõe com -p:Version=X.Y.Z -->
+    <Version>1.0.0</Version>
+    <Company>paulo9z2</Company>
+    <Product>Translucid Notification Music</Product>
+  </PropertyGroup>
+
+</Project>

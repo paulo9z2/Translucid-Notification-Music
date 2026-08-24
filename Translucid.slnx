@@ -1,6 +1,5 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Translucid.App/Translucid.App.csproj" />
-    <Project Path="src/Translucid.Core/Translucid.Core.csproj" />
-  </Folder>
+  <Project Path="src/Translucid.App/Translucid.App.csproj" />
+  <Project Path="src/Translucid.Core/Translucid.Core.csproj" />
+  <Project Path="src/Translucid.Deploy/Translucid.Deploy.csproj" />
 </Solution>
