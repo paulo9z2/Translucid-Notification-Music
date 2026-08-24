@@ -24,8 +24,12 @@ public partial class MainWindow : Window
 {
     private const double DefaultHeight = 172;
     private const double LyricsExpandedHeight = 408;
+    private const double DefaultWidth = 440;
+    private const double MinScale = 0.7;
+    private const double MaxScale = 1.6;
     private const double PaletteSeconds = 1.4;
     private static readonly byte[] PaletteAlphas = { 0x40, 0x34, 0x2A };
+    private bool _isInitializingSize = true;
 
     private readonly MediaTracker _tracker = new();
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromMilliseconds(500) };
@@ -95,6 +99,7 @@ public partial class MainWindow : Window
         {
             PositionWindow();
         }
+        _isInitializingSize = false;
 
         LyricsToggleButton.Visibility = AppSettings.Current.LyricsEnabled
             ? Visibility.Visible
@@ -180,7 +185,8 @@ public partial class MainWindow : Window
     /// <summary>
     /// A região de recorte (SetWindowRgn) fica FIXA no tamanho da janela quando
     /// aplicada — ao expandir para as letras, tudo abaixo da altura original era
-    /// cortado pelo DWM. Reaplica a região a cada mudança de tamanho.
+    /// cortado pelo DWM. Reaplica a região a cada mudança de tamanho e mantém
+    /// o conteúdo escalado proporcionalmente.
     /// </summary>
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -188,7 +194,22 @@ public partial class MainWindow : Window
         {
             DesktopFx.RoundCorners(_hwnd, 14);
         }
+
+        if (!_isInitializingSize && e.PreviousSize is { Width: > 0 })
+        {
+            // Conteúdo acompanha a largura da janela (o usuário redimensionou
+            // pela borda): escala = nova largura / largura padrão de design.
+            ContentScale = Math.Clamp(ActualWidth / DefaultWidth, MinScale, MaxScale);
+        }
+
+        // Painel de letras cresce junto com a altura extra da janela.
+        var lyricsHeight = Math.Max(80, ActualHeight - DefaultBaseHeight() - 36);
+        LyricsScroll.Height = lyricsHeight;
+        LyricsStatusText.Height = lyricsHeight;
     }
+
+    /// <summary>Altura base do widget SEM letras (172 no padrão; escala com o conteúdo).</summary>
+    private double DefaultBaseHeight() => 172 * ContentScale;
 
     private void OnMediaUpdated(MediaUpdate update)
     {
@@ -846,6 +867,9 @@ public partial class MainWindow : Window
         return position;
     }
 
+    /// <summary>Altura extra que o painel de letras adiciona à janela (escala com o conteúdo).</summary>
+    private double LyricsPanelTargetHeight() => 236 * ContentScale;
+
     private void LyricsToggleButton_Click(object sender, RoutedEventArgs e)
     {
         if (_lyricsExpanded)
@@ -855,7 +879,8 @@ public partial class MainWindow : Window
         }
 
         _lyricsExpanded = true;
-        var heightAnim = new DoubleAnimation(Height, LyricsExpandedHeight, TimeSpan.FromMilliseconds(280))
+        var targetHeight = Height + LyricsPanelTargetHeight();
+        var heightAnim = new DoubleAnimation(Height, targetHeight, TimeSpan.FromMilliseconds(280))
         {
             EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
         };
@@ -881,7 +906,8 @@ public partial class MainWindow : Window
     private void CollapseLyrics()
     {
         _lyricsExpanded = false;
-        var heightAnim = new DoubleAnimation(Height, DefaultHeight, TimeSpan.FromMilliseconds(280))
+        var targetHeight = Math.Max(DefaultHeight * ContentScale, Height - LyricsPanelTargetHeight());
+        var heightAnim = new DoubleAnimation(Height, targetHeight, TimeSpan.FromMilliseconds(280))
         {
             EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
         };
@@ -975,6 +1001,9 @@ public partial class MainWindow : Window
         var settings = AppSettings.Current;
         settings.Left = Left;
         settings.Top = Top;
+        settings.Width = Width;
+        settings.Height = Height;
+        settings.Scale = ContentScale;
         settings.Locked = _locked;
         settings.Save();
     }
@@ -990,6 +1019,48 @@ public partial class MainWindow : Window
         Left = settings.Left;
         Top = settings.Top;
         _locked = settings.Locked;
+
+        // Tamanho personalizado pelo usuário (resize pela borda).
+        if (settings is { Width: > 0, Height: > 0 })
+        {
+            var w = Math.Clamp(settings.Width, MinWidth, MaxWidth);
+            var h = Math.Clamp(settings.Height, MinHeight, MaxHeight);
+            if (Math.Abs(w - DefaultWidth) > 0.5 || Math.Abs(h - DefaultHeight) > 0.5)
+            {
+                Width = w;
+                Height = h;
+            }
+        }
+
+        if (settings.Scale > 0)
+        {
+            ContentScale = Math.Clamp(settings.Scale, MinScale, MaxScale);
+        }
+    }
+
+    /// <summary>Altura extra de letras proporcional à largura atual.</summary>
+    private double LyricsExtraForWidth(double width) => width * 0.536; // (408-172)/440
+
+    /// <summary>
+    /// Escala do conteúdo interno: aplicada como LayoutTransform para tudo
+    /// (capa, fontes, botões, paddings) crescer/diminuir junto com a janela.
+    /// </summary>
+    private double _contentScale = 1.0;
+    private double ContentScale
+    {
+        get => _contentScale;
+        set
+        {
+            var v = Math.Clamp(value, MinScale, MaxScale);
+            if (Math.Abs(v - _contentScale) < 0.001)
+            {
+                return;
+            }
+
+            _contentScale = v;
+            Shell.LayoutTransform = new ScaleTransform(v, v);
+            UpdateLayout();
+        }
     }
 
     private static T? FindAncestor<T>(DependencyObject current) where T : DependencyObject

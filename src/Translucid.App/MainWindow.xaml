@@ -5,15 +5,23 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Translucid.App"
         mc:Ignorable="d"
-        Title="Translucid" Width="440" Height="172"
+        Title="Translucid" Width="440" Height="172" MinWidth="300" MinHeight="120" MaxWidth="900" MaxHeight="600"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ShowInTaskbar="False" ResizeMode="NoResize"
+        ShowInTaskbar="False"
         WindowStartupLocation="Manual"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"
         MouseRightButtonUp="Window_MouseRightButtonUp"
         PreviewMouseWheel="Window_PreviewMouseWheel"
         SizeChanged="Window_SizeChanged"
         Loaded="Window_Loaded">
+    <WindowChrome.WindowChrome>
+        <!-- Borda de redimensionamento nativa sem a moldura do Windows:
+             o usuário agarra qualquer borda/canto e arrasta para redimensionar.
+             ResizeBorderThickness=8; GlassFrameThickness=0 remove a sombra
+             branca do frame; CaptionHeight=0 evita "faixa de arraste". -->
+        <WindowChrome ResizeBorderThickness="8" GlassFrameThickness="0"
+                      CaptionHeight="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
     <Window.Resources>
         <Style x:Key="MediaButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -232,7 +240,7 @@
 
             <!-- Painel de letras: só aparece quando a seta é clicada -->
             <Grid x:Name="LyricsPanel" Grid.Row="2" Margin="16,8,16,0" Visibility="Collapsed">
-                <ScrollViewer x:Name="LyricsScroll" Height="228" Visibility="Collapsed"
+                <ScrollViewer x:Name="LyricsScroll" Height="228" MinHeight="80" Visibility="Collapsed"
                               VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
                         <!-- respiro p/ primeira e última linha alcançarem o centro -->

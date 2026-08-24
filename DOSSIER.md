@@ -489,3 +489,13 @@ musik-plasmoid (KDE), kil0bit-system-monitor (Win11), WinState, GlintBar.
     com timestamps por palavra o avanço é exato; sem eles, um gradiente
     contínuo varre a linha proporcional à duração real. O tick de 500 ms
     chama `UpdateActiveWordProgress()` para animar sem recriar Inlines.
+16. **Widget redimensionável pela borda** — `ResizeMode` nativo via
+    `WindowChrome` (ResizeBorderThickness 8, GlassFrameThickness 0, sem faixa
+    de caption): o usuário agarra qualquer borda/canto e arrasta. Limites
+    MinWidth/MinHeight/MaxWidth/MaxHeight no XAML (300×120 a 900×600). O
+    conteúdo interno escala junto (`Shell.LayoutTransform = ScaleTransform`)
+    com fator derivado da largura (largura/440, clamp 0.7–1.6) e é persistido
+    em ui.json (`Width`, `Height`, `Scale`). O painel de letras expande com
+    altura relativa (`236 × ContentScale`) e o ScrollViewer acompanha a
+    janela (`ActualHeight − base − 36`). Expansão/recolhimento das letras
+    também passou a ser relativo ao tamanho atual.

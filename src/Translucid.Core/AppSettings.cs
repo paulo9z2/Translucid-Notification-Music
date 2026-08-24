@@ -20,6 +20,16 @@ public sealed class AppSettings
 
     public double Left { get; set; }
     public double Top { get; set; }
+
+    /// <summary>Largura personalizada pelo usuário (0 = usar padrão 440).</summary>
+    public double Width { get; set; }
+
+    /// <summary>Altura base (com letras fechadas) personalizada (0 = padrão 172).</summary>
+    public double Height { get; set; }
+
+    /// <summary>Fator de escala da interface (1.0 = padrão). Ajustado junto com o resize.</summary>
+    public double Scale { get; set; } = 1.0;
+
     public bool Locked { get; set; } = true;
     public bool LyricsEnabled { get; set; }
 
@@ -97,7 +107,7 @@ public sealed class AppSettings
                 var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath));
                 if (settings is not null)
                 {
-                    settings.HasSavedPosition = true;
+                    settings.HasSavedPosition = settings.Width > 0 || settings.Height > 0 || settings.Left != 0 || settings.Top != 0;
                     return settings;
                 }
             }
