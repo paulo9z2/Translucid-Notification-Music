@@ -7,8 +7,16 @@ namespace Translucid.App;
 /// </summary>
 public partial class App : System.Windows.Application
 {
-    /// <summary>Versão atual; comparada com a tag do último release no GitHub.</summary>
-    public const string CurrentVersion = "1.2.0";
+    /// <summary>
+    /// Versão atual do app, lida do assembly (InformationalVersion — definida no
+    /// publish via -p:Version=X.Y.Z). Nunca mais hardcodada: esquecer de bumpar
+    /// fazia o updater oferecer a mesma versão para sempre.
+    /// </summary>
+    public static string CurrentVersion { get; } =
+        System.Reflection.Assembly.GetEntryAssembly()?
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .FirstOrDefault()?.InformationalVersion ?? "0.0.0";
     public App()
     {
         ShutdownMode = ShutdownMode.OnExplicitShutdown;

@@ -84,7 +84,8 @@ public static class UpdateChecker
         }
     }
 
-    /// <summary>Comparação numérica por parte: 1.10.0 &gt; 1.9.9 (string compararia errado).</summary>
+    /// <summary>Comparação numérica por parte: 1.10.0 &gt; 1.9.9 (string compararia errado).
+    /// Ignora sufixo de commit (ex.: "1.2.2+1c325ee").</summary>
     internal static bool IsNewer(string latest, string current)
     {
         var a = Parse(latest);
@@ -103,7 +104,8 @@ public static class UpdateChecker
     }
 
     private static int[] Parse(string version) =>
-        version.Split('.', '-', ' ')
+        version.Split('+')[0] // "1.2.2+1c325ee" → "1.2.2" (InformationalVersion traz o commit)
+            .Split('.', '-', ' ')
             .Select(p => int.TryParse(p, out var n) ? n : 0)
             .ToArray();
 
