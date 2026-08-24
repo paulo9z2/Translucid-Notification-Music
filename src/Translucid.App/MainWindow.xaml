@@ -240,7 +240,7 @@
                         <ItemsControl x:Name="LyricsItems">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock x:Name="LineText" Text="{Binding}" FontSize="12.5"
+                                    <TextBlock x:Name="LineText" FontSize="12.5"
                                                TextAlignment="Center" Cursor="Hand"
                                                MouseLeftButtonDown="LyricLine_Click"
                                                Foreground="#73FFFFFF" Margin="0,5,0,5"/>

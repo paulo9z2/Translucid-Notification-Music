@@ -15,6 +15,7 @@ using Image = System.Windows.Controls.Image;
 using Button = System.Windows.Controls.Button;
 using Cursors = System.Windows.Input.Cursors;
 using Panel = System.Windows.Controls.Panel;
+using Run = System.Windows.Documents.Run;
 using Application = System.Windows.Application;
 
 namespace Translucid.App;
@@ -557,7 +558,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        LyricsItems.ItemsSource = _lyrics.Select(l => l.Text).ToArray();
+        LyricsItems.ItemsSource = _lyrics; // itens são LyricLine (não só texto)
         _lyricsIndex = -1;
         LyricsScroll.Visibility = Visibility.Visible;
         LyricsStatusText.Visibility = Visibility.Collapsed;
@@ -586,6 +587,9 @@ public partial class MainWindow : Window
             _lyricsIndex = index;
             StyleLyricsLines(lines, index);
         }
+
+        // Karaokê por palavra na linha ativa (estilo Spicy Lyrics).
+        UpdateActiveWordProgress();
 
         // Centraliza pela POSIÇÃO REAL da linha na árvore visual (as linhas têm
         // altura variável: a ativa é maior; pitch fixo acumula desvio).
@@ -664,22 +668,13 @@ public partial class MainWindow : Window
     /// <summary>Clique numa linha: pula a música para o tempo dela no LRC.</summary>
     private async void LyricLine_Click(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not TextBlock { DataContext: string lineText } ||
+        if (sender is not TextBlock { DataContext: LyricLine clicked } ||
             _lyrics is not { Length: > 0 } lines)
         {
             return;
         }
 
-        // O ItemsControl binda só o TEXTO da linha; recupera o instante
-        // procurando a primeira linha com esse texto (LRC raramente repete
-        // linhas em tempos diferentes, e repetir pula pro primeiro jeito — ok).
-        var index = Array.FindIndex(lines, l => l.Text == lineText);
-        if (index < 0)
-        {
-            return;
-        }
-
-        var accepted = await _tracker.SeekAsync(lines[index].Time).ConfigureAwait(true);
+        var accepted = await _tracker.SeekAsync(clicked.Time).ConfigureAwait(true);
         if (!accepted)
         {
             FlashLyricsSeekDenied();
@@ -688,7 +683,7 @@ public partial class MainWindow : Window
 
         // Seek aceito: reposiciona o relógio local na hora pedida para a UI
         // não continuar contando do lugar antigo até o próximo evento SMTC.
-        _positionAtStamp = lines[index].Time;
+        _positionAtStamp = clicked.Time;
         _positionStamp = DateTime.UtcNow;
         RenderPosition();
         SyncLyrics();
@@ -705,7 +700,11 @@ public partial class MainWindow : Window
         LyricsScroll.BeginAnimation(UIElement.OpacityProperty, anim, HandoffBehavior.SnapshotAndReplace);
     }
 
-    /// <summary>Efeito spicy-lyrics: ativa em destaque, passadas apagadas, futuras visíveis.</summary>
+    /// <summary>
+    /// Efeito spicy-lyrics: ativa em destaque, passadas apagadas, futuras
+    /// visíveis. A linha ativa com marcações por palavra ganha o gradiente
+    /// varredor (palavra cantada fica branca, a futura translúcida).
+    /// </summary>
     private void StyleLyricsLines(LyricLine[] lines, int active)
     {
         for (var i = 0; i < lines.Length; i++)
@@ -722,14 +721,129 @@ public partial class MainWindow : Window
 
             text.FontSize = isActive ? 15.5 : 12.5;
             text.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
-            text.Foreground = new SolidColorBrush(
-                isActive ? Colors.White
-                : isPast ? Color.FromArgb(0x3D, 0xFF, 0xFF, 0xFF)   // passada: bem apagada
-                         : Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF)); // futura: legível
-            text.Effect = isActive
-                ? new DropShadowEffect { Color = Colors.White, Opacity = 0.55, BlurRadius = 9, ShadowDepth = 0 }
-                : null;
+
+            if (!isActive || lines[i].Words is not { Count: >= 2 } words)
+            {
+                // Linha sem karaokê: cor sólida, sem Runs.
+                if (text.Inlines.Count == 0 || text.Tag as string != "plain")
+                {
+                    text.Inlines.Clear();
+                    text.Inlines.Add(new Run(lines[i].Text));
+                    text.Tag = "plain";
+                    text.TextDecorations = null;
+                }
+                text.Foreground = new SolidColorBrush(
+                    isActive ? Colors.White
+                    : isPast ? Color.FromArgb(0x3D, 0xFF, 0xFF, 0xFF)   // passada: bem apagada
+                             : Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF)); // futura: legível
+                text.Effect = isActive
+                    ? new DropShadowEffect { Color = Colors.White, Opacity = 0.55, BlurRadius = 9, ShadowDepth = 0 }
+                    : null;
+                continue;
+            }
+
+            BuildWordRuns(text, lines[i]);
+            text.Effect = new DropShadowEffect { Color = Colors.White, Opacity = 0.55, BlurRadius = 9, ShadowDepth = 0 };
         }
+    }
+
+    /// <summary>Monta os Runs por palavra da linha ativa (uma vez por troca de linha).</summary>
+    private void BuildWordRuns(TextBlock text, LyricLine line)
+    {
+        if (text.Tag as string == "words" && text.Inlines.Count == line.Words!.Count)
+        {
+            return; // já montada
+        }
+
+        _wordRuns = new List<(Run, SolidColorBrush)>(line.Words!.Count);
+        text.Inlines.Clear();
+        foreach (var w in line.Words!)
+        {
+            var brush = new SolidColorBrush(Color.FromArgb(0x45, 0xFF, 0xFF, 0xFF));
+            brush.Freeze();
+            var run = new Run(w.Text) { Foreground = brush };
+            text.Inlines.Add(run);
+            _wordRuns.Add((run, brush));
+        }
+        text.Tag = "words";
+        _activeLineWords = line.Words;
+    }
+
+    private List<(Run Run, SolidColorBrush Brush)>? _wordRuns;
+    private IReadOnlyList<WordSpan>? _activeLineWords;
+
+    /// <summary>
+    /// O efeito Spicy: a linha ativa é pintada palavra a palavra conforme o
+    /// tempo avança. Com marcações &lt;mm:ss.xx&gt; no LRC estendido o avanço é
+    /// exato; sem elas, a progressão é proporcional à duração real da linha
+    /// (start_ms/end_ms), como no Spicy Lyrics.
+    /// </summary>
+    private void UpdateActiveWordProgress()
+    {
+        if (_wordRuns is null || !_lyricsExpanded || _lyricsIndex < 0 || _lyrics is not { } lines)
+        {
+            return;
+        }
+
+        var position = CurrentPlaybackPosition();
+        var line = lines[_lyricsIndex];
+        var total = line.End - line.Time;
+        var progress = total > TimeSpan.Zero
+            ? Math.Clamp((position - line.Time).TotalMilliseconds / total.TotalMilliseconds, 0, 1)
+            : 1.0;
+
+        // Palavra "atual" pela progressão relativa na linha.
+        var currentWordIndex = -1;
+        if (line.Words is { Count: > 0 } words)
+        {
+            for (var i = 0; i < words.Count; i++)
+            {
+                if (position >= words[i].Start)
+                {
+                    currentWordIndex = i;
+                }
+                else break;
+            }
+        }
+
+        for (var i = 0; i < _wordRuns.Count; i++)
+        {
+            double opacity;
+            if (currentWordIndex >= 0)
+            {
+                // Tem timestamps de palavra: cantadas = 1, atual acende, futuras apagadas.
+                opacity = i < currentWordIndex ? 1.0
+                        : i == currentWordIndex ? 1.0
+                        : i == currentWordIndex + 1 ? 0.55
+                        : 0.45;
+            }
+            else
+            {
+                // Sem timestamps por palavra: gradiente contínuo pela posição.
+                // Cada palavra acende quando a "onda" de leitura chega nela.
+                var wordFraction = (i + 0.5) / _wordRuns.Count;
+                var delta = progress - wordFraction;
+                opacity = delta >= 0 ? 1.0
+                        : delta > -0.08 ? 0.75
+                        : delta > -0.18 ? 0.55
+                        : 0.45;
+            }
+
+            var (_, brush) = _wordRuns[i];
+            var target = (byte)(255 * opacity);
+            if (Math.Abs(brush.Color.A - target) > 4)
+            {
+                brush.Color = Color.FromArgb(target, 0xFF, 0xFF, 0xFF);
+            }
+        }
+    }
+
+    private TimeSpan CurrentPlaybackPosition()
+    {
+        var position = _media.IsPlaying
+            ? _positionAtStamp + (DateTime.UtcNow - _positionStamp)
+            : _positionAtStamp;
+        return position;
     }
 
     private void LyricsToggleButton_Click(object sender, RoutedEventArgs e)

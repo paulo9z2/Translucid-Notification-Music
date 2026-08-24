@@ -478,3 +478,14 @@ musik-plasmoid (KDE), kil0bit-system-monitor (Win11), WinState, GlintBar.
     de origem negar o seek, o painel pisca em opacidade como feedback. Cursor
     vira mão sobre as linhas. Versão do app agora lida do assembly
     (`-p:Version`), não mais de constante hardcodada.
+15. **Letras estilo Spicy Lyrics (karaokê progressivo)** — inspiração no
+    plugin Spicetify do Spikerko (implementação própria em C#; o original é
+    TS/AGPL e depende de API própria). `LyricLine` agora carrega
+    `End` (fim real da linha) e `Words` opcionais. Fontes: campo `lyricsfile`
+    da LRCLIB (start_ms/end_ms reais por linha, parser YAML mínimo) tem
+    precedência sobre LRC; LRC estendido `<mm:ss.xx>` por palavra é suportado
+    quando presente. A linha ativa renderiza cada palavra como um `Run` com
+    brush próprio: palavras cantadas ficam brancas, futuras translúcidas —
+    com timestamps por palavra o avanço é exato; sem eles, um gradiente
+    contínuo varre a linha proporcional à duração real. O tick de 500 ms
+    chama `UpdateActiveWordProgress()` para animar sem recriar Inlines.
