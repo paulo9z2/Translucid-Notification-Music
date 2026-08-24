@@ -7,6 +7,11 @@ namespace Translucid.App;
 /// </summary>
 public partial class App : System.Windows.Application
 {
+    public App()
+    {
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+    }
+
     private System.Windows.Forms.NotifyIcon? _tray;
     private bool _balloonShown;
 
@@ -30,6 +35,7 @@ public partial class App : System.Windows.Application
         var menu = new System.Windows.Forms.ContextMenuStrip();
         menu.Items.Add("Mostrar widget", null, (_, _) => ShowWindow(true));
         menu.Items.Add("Esconder widget", null, (_, _) => ShowWindow(false));
+        menu.Items.Add("Configurações…", null, (_, _) => OpenSettings());
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Sair", null, (_, _) => Quit());
         _tray.ContextMenuStrip = menu;
@@ -71,6 +77,11 @@ public partial class App : System.Windows.Application
                 MainWindow.Hide();
             }
         });
+    }
+
+    public void OpenSettings()
+    {
+        Dispatcher.Invoke(SettingsWindow.ShowOrFocus);
     }
 
     private void Quit()

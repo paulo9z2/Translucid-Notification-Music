@@ -11,6 +11,8 @@
         WindowStartupLocation="Manual"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"
         MouseRightButtonUp="Window_MouseRightButtonUp"
+        PreviewMouseWheel="Window_PreviewMouseWheel"
+        SizeChanged="Window_SizeChanged"
         Loaded="Window_Loaded">
     <Window.Resources>
         <Style x:Key="MediaButton" TargetType="Button">
@@ -42,13 +44,26 @@
     </Window.Resources>
 
     <Border x:Name="Shell" CornerRadius="14" BorderThickness="1" BorderBrush="#2EFFFFFF">
-        <Grid Margin="16,14,16,10">
+        <Grid>
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid>
+            <!-- Degrade translúcido na cor da capa (fica por trás de tudo) -->
+            <Rectangle x:Name="GradientOverlay" RadiusX="13" RadiusY="13" Margin="1"
+                       IsHitTestVisible="False">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop x:Name="PaletteTop" Color="#400A0B0D"/>
+                        <GradientStop x:Name="PaletteMid" Offset="0.5" Color="#340A0B0D"/>
+                        <GradientStop x:Name="PaletteBot" Offset="1" Color="#2A0A0B0D"/>
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
+            <Grid Margin="16,14,16,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -56,8 +71,23 @@
 
                 <Border x:Name="CoverFrame" Width="86" Height="86" CornerRadius="10"
                         Background="#11000000" BorderBrush="#26FFFFFF" BorderThickness="1">
-                    <Image x:Name="CoverImage" Stretch="UniformToFill"
-                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <Border.Clip>
+                        <RectangleGeometry RadiusX="10" RadiusY="10" Rect="0,0,86,86"/>
+                    </Border.Clip>
+                    <Grid>
+                        <Image x:Name="CoverImageA" Stretch="UniformToFill"
+                               RenderOptions.BitmapScalingMode="HighQuality">
+                            <Image.RenderTransform>
+                                <TranslateTransform x:Name="CoverXformA"/>
+                            </Image.RenderTransform>
+                        </Image>
+                        <Image x:Name="CoverImageB" Stretch="UniformToFill" Opacity="0"
+                               RenderOptions.BitmapScalingMode="HighQuality">
+                            <Image.RenderTransform>
+                                <TranslateTransform x:Name="CoverXformB"/>
+                            </Image.RenderTransform>
+                        </Image>
+                    </Grid>
                 </Border>
 
                 <Grid Grid.Column="1" Margin="16,0,0,0">
@@ -106,10 +136,18 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </StackPanel>
+
+                <TextBlock x:Name="VolumeText" Text="" FontSize="15" FontWeight="SemiBold" Foreground="White"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0" IsHitTestVisible="False">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="0" Opacity="0.85"/>
+                    </TextBlock.Effect>
+                </TextBlock>
             </Grid>
 
-            <Grid Grid.Row="1" Margin="0,10,0,0">
+            <Grid Grid.Row="1" Margin="16,10,16,0">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="8"/>
                     <ColumnDefinition Width="*"/>
@@ -117,15 +155,60 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock x:Name="CurrentTimeText" Text="0:00" Foreground="#99FFFFFF"
-                           FontSize="10.5" FontFamily="Cascadia Mono"/>
-                <Border Grid.Column="2" Height="4" CornerRadius="2" Background="#26FFFFFF"
+                <Button x:Name="LyricsToggleButton" Width="16" Height="16" FontFamily="Segoe MDL2 Assets"
+                        FontSize="8" Foreground="#99FFFFFF" Background="Transparent" BorderThickness="0"
+                        Cursor="Hand" Content="&#xE70D;" Click="LyricsToggleButton_Click"
+                        ToolTip="Letras sincronizadas" Visibility="Collapsed">
+                    <Button.RenderTransform>
+                        <RotateTransform x:Name="LyricsChevronRotate" Angle="0" CenterX="8" CenterY="8"/>
+                    </Button.RenderTransform>
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#26FFFFFF"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <TextBlock x:Name="CurrentTimeText" Grid.Column="1" Text="0:00" Foreground="#99FFFFFF"
+                           FontSize="10.5" FontFamily="Cascadia Mono" VerticalAlignment="Center"/>
+                <Border Grid.Column="3" Height="4" CornerRadius="2" Background="#26FFFFFF"
                         VerticalAlignment="Center">
                     <Border x:Name="ProgressFill" CornerRadius="2" Background="#5CB8FF"
                             HorizontalAlignment="Left" Width="0"/>
                 </Border>
-                <TextBlock x:Name="DurationText" Grid.Column="4" Text="0:00" Foreground="#99FFFFFF"
-                           FontSize="10.5" FontFamily="Cascadia Mono"/>
+                <TextBlock x:Name="DurationText" Grid.Column="5" Text="0:00" Foreground="#99FFFFFF"
+                           FontSize="10.5" FontFamily="Cascadia Mono" VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- Painel de letras: só aparece quando a seta é clicada -->
+            <Grid x:Name="LyricsPanel" Grid.Row="2" Margin="16,8,16,0" Visibility="Collapsed">
+                <ScrollViewer x:Name="LyricsScroll" Height="228" Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <!-- respiro p/ primeira e última linha alcançarem o centro -->
+                        <Border x:Name="LyricsSpacerTop" Height="104"/>
+                        <ItemsControl x:Name="LyricsItems">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock x:Name="LineText" Text="{Binding}" FontSize="12.5"
+                                               TextAlignment="Center"
+                                               Foreground="#73FFFFFF" Margin="0,5,0,5"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border x:Name="LyricsSpacerBottom" Height="104"/>
+                    </StackPanel>
+                </ScrollViewer>
+                <TextBlock x:Name="LyricsStatusText" Text="" Foreground="#90FFFFFF" FontSize="12.5"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Height="228" Visibility="Collapsed"/>
             </Grid>
         </Grid>
     </Border>

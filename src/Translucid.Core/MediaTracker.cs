@@ -10,6 +10,8 @@ public sealed class MediaUpdate
     public required string Artist { get; init; }
     public required string Album { get; init; }
     public required string AppName { get; init; }
+    /// <summary>Nome do processo (ex.: "chrome.exe") dono da sessão, se der pra resolver.</summary>
+    public string? AppProcessName { get; init; }
     public byte[]? Thumbnail { get; init; }
     public TimeSpan Position { get; init; }
     public TimeSpan Duration { get; init; }
@@ -41,6 +43,11 @@ public sealed class MediaTracker : IDisposable
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private GlobalSystemMediaTransportControlsSession? _session;
     private readonly SemaphoreSlim _gate = new(1, 1);
+
+    // A thumbnail só é relida quando a música em si muda (evita re-decodificar
+    // PNG a cada inchada de posição).
+    private string? _lastArtKey;
+    private byte[]? _lastThumb;
 
     public async Task StartAsync()
     {
@@ -80,6 +87,8 @@ public sealed class MediaTracker : IDisposable
             _gate.Release();
         }
 
+        _lastArtKey = null;
+        _lastThumb = null;
         await PushAsync();
     }
 
@@ -113,7 +122,8 @@ public sealed class MediaTracker : IDisposable
             var controls = playback.Controls;
 
             byte[]? thumbnail = null;
-            if (props?.Thumbnail is not null)
+            var artKey = $"{props?.Title}|{props?.Artist}|{props?.AlbumTitle}";
+            if (props?.Thumbnail is not null && (_lastArtKey != artKey || _lastThumb is null))
             {
                 try
                 {
@@ -125,11 +135,17 @@ public sealed class MediaTracker : IDisposable
                     }
 
                     thumbnail = buffer.ToArray();
+                    _lastArtKey = artKey;
+                    _lastThumb = thumbnail;
                 }
                 catch
                 {
                     thumbnail = null;
                 }
+            }
+            else
+            {
+                thumbnail = _lastThumb;
             }
 
             var duration = timeline.EndTime - timeline.StartTime;
@@ -140,6 +156,7 @@ public sealed class MediaTracker : IDisposable
                 Artist = props?.Artist ?? string.Empty,
                 Album = props?.AlbumTitle ?? string.Empty,
                 AppName = ResolveAppName(session.SourceAppUserModelId),
+                AppProcessName = ResolveProcessName(session.SourceAppUserModelId),
                 Thumbnail = thumbnail,
                 Position = timeline.Position,
                 Duration = duration > TimeSpan.Zero ? duration : TimeSpan.Zero,
@@ -153,6 +170,16 @@ public sealed class MediaTracker : IDisposable
         {
             Updated?.Invoke(MediaUpdate.Idle);
         }
+    }
+
+    /// <summary>
+    /// "chrome.exe", "Spotify.exe", ... quando o AUMID já é um exe (apps Win32).
+    /// Apps empacotados (Store/PWA) retornam null e o VolumeMixer tenta um fallback.
+    /// </summary>
+    private static string? ResolveProcessName(string appUserModelId)
+    {
+        var id = appUserModelId.Trim();
+        return id.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? id : null;
     }
 
     private static string ResolveAppName(string appUserModelId)

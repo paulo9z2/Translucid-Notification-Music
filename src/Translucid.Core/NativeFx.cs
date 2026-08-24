@@ -44,6 +44,14 @@ public static class DesktopFx
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
 
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+    private static readonly IntPtr HwndBottom = new(1);
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoActivate = 0x0010;
+
     [DllImport("dwmapi.dll", PreserveSig = true)]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
@@ -148,5 +156,22 @@ public static class DesktopFx
     {
         var style = GetWindowLong(hwnd, GWL_EXSTYLE);
         SetWindowLong(hwnd, GWL_EXSTYLE, style | (int)WS_EX_TOOLWINDOW);
+    }
+
+    /// <summary>
+    /// Coloca a janela abaixo de todas as outras do sistema (HWND_BOTTOM) e
+    /// impede que ela se ative. Para manter o widget "sempre atrás", chame
+    /// isso periodicamente (o Windows re-ordena quando outras janelas mudam).
+    /// </summary>
+    public static void PlaceBelowWindows(IntPtr hwnd)
+    {
+        try
+        {
+            SetWindowPos(hwnd, HwndBottom, 0, 0, 0, 0, SwpNoSize | SwpNoMove | SwpNoActivate);
+        }
+        catch
+        {
+            // janela já destruída ou sem dono? ignora
+        }
     }
 }
