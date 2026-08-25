@@ -30,6 +30,9 @@ public sealed class AppSettings
     /// <summary>Fator de escala da interface (1.0 = padrão). Ajustado junto com o resize.</summary>
     public double Scale { get; set; } = 1.0;
 
+    /// <summary>Painel de letras estava aberto quando fechou (restaurado no boot).</summary>
+    public bool LyricsExpanded { get; set; }
+
     public bool Locked { get; set; } = true;
     public bool LyricsEnabled { get; set; }
 

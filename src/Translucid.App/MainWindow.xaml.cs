@@ -508,6 +508,15 @@ public partial class MainWindow : Window
     {
         var token = ++_volumeToken;
         VolumeText.Text = $"{(int)Math.Round(volume * 100)}%";
+
+        // Ícone na capa acompanha o volume (aparece no hover)
+        var pct = (int)Math.Round(volume * 100);
+        VolumeHoverPct.Text = $"{pct}%";
+        if (pct <= 0)
+            VolumeHoverIcon.Text = "\uE74F"; // mudo
+        else
+            VolumeHoverIcon.Text = "\uE767"; // volume
+
         VolumeText.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(80)));
 
         var fade = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
@@ -520,6 +529,24 @@ public partial class MainWindow : Window
             }
         };
         fade.Start();
+    }
+
+    // Hover na capa: mostra o badge com ícone + % do volume do app tocando
+    private void CoverFrame_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        var volume = VolumeMixer.Get(_media.AppProcessName) ?? 0f;
+        var pct = (int)Math.Round(volume * 100);
+        VolumeHoverPct.Text = $"{pct}%";
+        VolumeHoverIcon.Text = pct <= 0 ? "\uE74F" : "\uE767";
+
+        VolumeHoverBadge.BeginAnimation(UIElement.OpacityProperty,
+            new DoubleAnimation(1, TimeSpan.FromMilliseconds(120)));
+    }
+
+    private void CoverFrame_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        VolumeHoverBadge.BeginAnimation(UIElement.OpacityProperty,
+            new DoubleAnimation(0, TimeSpan.FromMilliseconds(200)));
     }
 
     // ------------------------------------------------------------- letras
@@ -1001,9 +1028,15 @@ public partial class MainWindow : Window
         var settings = AppSettings.Current;
         settings.Left = Left;
         settings.Top = Top;
+
+        // Altura SEM o painel de letras: se fechou com letras abertas, a Height
+        // atual inclui os ~236*scale do painel — salvar assim fazia o widget
+        // nascer gigante no boot seguinte. Normaliza para a base antes de salvar.
+        var savedHeight = _lyricsExpanded ? Height - LyricsPanelTargetHeight() : Height;
         settings.Width = Width;
-        settings.Height = Height;
+        settings.Height = Math.Max(DefaultHeight * ContentScale, savedHeight);
         settings.Scale = ContentScale;
+        settings.LyricsExpanded = _lyricsExpanded;
         settings.Locked = _locked;
         settings.Save();
     }
@@ -1035,6 +1068,33 @@ public partial class MainWindow : Window
         if (settings.Scale > 0)
         {
             ContentScale = Math.Clamp(settings.Scale, MinScale, MaxScale);
+        }
+
+        // Reabre o painel de letras se estava aberto quando fechou. A Height
+        // salva já é a base (sem painel) — a expansão soma por cima dela.
+        if (settings.LyricsExpanded && AppSettings.Current.LyricsEnabled
+                                   && settings is { Width: > 0, Height: > 0 })
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                _lyricsExpanded = true;
+                LyricsChevronRotate.Angle = 180;
+                LyricsPanel.Visibility = Visibility.Visible;
+
+                if (_lyrics is { Length: > 0 })
+                {
+                    ShowLyricsContent();
+                    SyncLyrics();
+                }
+                else if (ReferenceEquals(_media, MediaUpdate.Idle))
+                {
+                    SetLyricsStatus("Ponha uma música tocando para ver a letra");
+                }
+                else
+                {
+                    SetLyricsStatus(_lyricsKey is null ? "Buscando letras…" : "Sem letras encontradas para esta música");
+                }
+            }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
     }
 
