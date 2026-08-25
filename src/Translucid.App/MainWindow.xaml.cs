@@ -141,12 +141,17 @@ public partial class MainWindow : Window
         }
 
         UpdateButton.Visibility = Visibility.Collapsed;
-        UpdateStatusText.Text = "baixando…";
-        UpdateStatusText.Visibility = Visibility.Visible;
+        UpdateStatusText.Visibility = Visibility.Collapsed;
+
+        // Tela de progresso (card escuro, barra amarela) no lugar do texto "baixando…"
+        var progressWindow = new UpdateProgressWindow { Owner = this };
+        progressWindow.Show();
+        var progress = new Progress<UpdateProgress>(p => progressWindow.Report(p));
 
         try
         {
-            await Task.Run(() => UpdateInstaller.InstallAsync(info)).ConfigureAwait(true);
+            await Task.Run(() => UpdateInstaller.InstallAsync(info, progress))
+                .ConfigureAwait(true);
 
             // O .cmd de troca já foi lançado e está esperando este processo
             // morrer. Sai de verdade (não vai para a bandeja).
@@ -154,8 +159,8 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Falhou o download/extração: restaura o pill para tentar de novo.
-            UpdateStatusText.Visibility = Visibility.Collapsed;
+            // Falhou o download/extração: fecha o card e restaura o pill para tentar de novo.
+            progressWindow.Close();
             UpdateButton.Visibility = Visibility.Visible;
         }
     }

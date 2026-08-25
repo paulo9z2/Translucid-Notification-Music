@@ -4,6 +4,7 @@
              xmlns:local="clr-namespace:Translucid.App"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <DropShadowEffect x:Key="DropShadow" BlurRadius="18" ShadowDepth="2"
+                          Opacity="0.45" Color="#000000"/>
     </Application.Resources>
 </Application>

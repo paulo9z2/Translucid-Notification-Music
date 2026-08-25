@@ -13,7 +13,7 @@ public static class UpdateChecker
     private const string LatestUrl =
         "https://api.github.com/repos/paulo9z2/Translucid-Notification-Music/releases/latest";
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
+    internal static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
 
     static UpdateChecker()
     {
