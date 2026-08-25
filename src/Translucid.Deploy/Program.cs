@@ -87,7 +87,7 @@ if (!makeRelease)
 Console.WriteLine($"[gh] release v{versionString}...");
 exit = Run("gh", new[]
 {
-    "release", $"create v{versionString}",
+    "release", "create", $"v{versionString}",
     "--title", $"Translucid v{versionString}",
     "--generate-notes",
     zipPath, zipPath + ".sha256",
@@ -95,10 +95,10 @@ exit = Run("gh", new[]
 if (exit != 0)
 {
     // Release/tag já existem: recria por cima.
-    Run("gh", new[] { "release", $"delete", $"v{versionString}", "--yes" }, ignoreFailure: true);
+    Run("gh", new[] { "release", "delete", $"v{versionString}", "--yes" }, ignoreFailure: true);
     exit = Run("gh", new[]
     {
-        "release", $"create v{versionString}",
+        "release", "create", $"v{versionString}",
         "--title", $"Translucid v{versionString}",
         "--generate-notes",
         zipPath, zipPath + ".sha256",
