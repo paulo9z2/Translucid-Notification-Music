@@ -245,10 +245,16 @@
 
                 <TextBlock x:Name="CurrentTimeText" Grid.Column="1" Text="0:00" Foreground="#99FFFFFF"
                            FontSize="10.5" FontFamily="Cascadia Mono" VerticalAlignment="Center"/>
-                <Border Grid.Column="3" Height="4" CornerRadius="2" Background="#26FFFFFF"
-                        VerticalAlignment="Center">
-                    <Border x:Name="ProgressFill" CornerRadius="2" Background="#5CB8FF"
-                            HorizontalAlignment="Left" Width="0"/>
+                <!-- Seek: área de hit 14px (cursor Hand) com barra visual de 4px centrada -->
+                <Border x:Name="ProgressTrack" Grid.Column="3" Height="14" CornerRadius="2" Background="Transparent"
+                        VerticalAlignment="Center" Cursor="Hand"
+                        MouseLeftButtonDown="ProgressTrack_MouseLeftButtonDown"
+                        MouseMove="ProgressTrack_MouseMove"
+                        MouseLeftButtonUp="ProgressTrack_MouseLeftButtonUp">
+                    <Border Height="4" CornerRadius="2" Background="#26FFFFFF" VerticalAlignment="Center">
+                        <Border x:Name="ProgressFill" CornerRadius="2" Background="#5CB8FF"
+                                HorizontalAlignment="Left" Width="0"/>
+                    </Border>
                 </Border>
                 <TextBlock x:Name="DurationText" Grid.Column="5" Text="0:00" Foreground="#99FFFFFF"
                            FontSize="10.5" FontFamily="Cascadia Mono" VerticalAlignment="Center"/>

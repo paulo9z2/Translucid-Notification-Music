@@ -20,6 +20,8 @@ public partial class SettingsWindow : Window
         AutoStartToggle.IsChecked = AppSettings.IsAutoStartEnabled();
         BottomToggle.IsChecked = AppSettings.Current.AlwaysOnBottom;
         LyricsToggle.IsChecked = AppSettings.Current.LyricsEnabled;
+        HotkeysToggle.IsChecked = AppSettings.Current.HotkeysEnabled;
+        ExtendedResizeToggle.IsChecked = AppSettings.Current.ExtendedResizeEnabled;
         Closed += (_, _) => _instance = null;
         _initializing = false;
     }
@@ -128,6 +130,34 @@ public partial class SettingsWindow : Window
         if (sender is System.Windows.Controls.Primitives.ToggleButton toggle)
         {
             AppSettings.Current.AlwaysOnBottom = toggle.IsChecked == true;
+            AppSettings.Current.Save();
+        }
+    }
+
+    private void HotkeysToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_initializing)
+        {
+            return;
+        }
+
+        if (sender is System.Windows.Controls.Primitives.ToggleButton toggle)
+        {
+            AppSettings.Current.HotkeysEnabled = toggle.IsChecked == true;
+            AppSettings.Current.Save();
+        }
+    }
+
+    private void ExtendedResizeToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_initializing)
+        {
+            return;
+        }
+
+        if (sender is System.Windows.Controls.Primitives.ToggleButton toggle)
+        {
+            AppSettings.Current.ExtendedResizeEnabled = toggle.IsChecked == true;
             AppSettings.Current.Save();
         }
     }

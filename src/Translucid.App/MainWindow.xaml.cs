@@ -8,6 +8,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using Translucid.Core;
 
 using Color = System.Windows.Media.Color;
@@ -27,6 +28,14 @@ public partial class MainWindow : Window
     private const double DefaultWidth = 440;
     private const double MinScale = 0.7;
     private const double MaxScale = 1.6;
+    // Opção B — limites estendidos (ativados via toggle ExtendedResizeEnabled)
+    private const double ExtendedMaxWidth = 1200;
+    private const double ExtendedMaxHeight = 800;
+    private const double ExtendedMaxScale = 2.5;
+    /// <summary>Limite de escala atual: 1.6 dormindo, 2.5 quando toggle ligado.</summary>
+    private double CurrentMaxScale => AppSettings.Current.ExtendedResizeEnabled ? ExtendedMaxScale : MaxScale;
+    private double CurrentMaxWidth => AppSettings.Current.ExtendedResizeEnabled ? ExtendedMaxWidth : 900;
+    private double CurrentMaxHeight => AppSettings.Current.ExtendedResizeEnabled ? ExtendedMaxHeight : 600;
     private const double PaletteSeconds = 1.4;
     private static readonly byte[] PaletteAlphas = { 0x40, 0x34, 0x2A };
     private bool _isInitializingSize = true;
@@ -36,6 +45,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _palette = new() { Interval = TimeSpan.FromMilliseconds(33) };
     private readonly DispatcherTimer _bottom = new() { Interval = TimeSpan.FromSeconds(1) };
     private IntPtr _hwnd;
+    private HotkeyManager? _hotkeys;
 
     private MediaUpdate _media = MediaUpdate.Idle;
     private DateTime _positionStamp;
@@ -43,10 +53,15 @@ public partial class MainWindow : Window
 
     private bool _locked = true;
 
+    // seek na barra de progresso (click + drag)
+    private bool _isDraggingProgress;
+
     // capa: duas camadas para o slide trocar a arte
     private int _coverLayer;
     private byte[]? _coverBytes;
     private long _hideToken;
+    // fila de direções para a animação da capa: 1 = vai (entra da direita), -1 = volta (entra da esquerda)
+    private readonly Queue<int> _coverNavQueue = new();
 
     // paleta: gradiente lento na cor da capa
     private readonly Color[] _cur = new Color[3];
@@ -67,6 +82,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Aplica limites de resize conforme toggle lembrado em ui.json (dormindo = 900×600/1.6, ativado = 1200×800/2.5)
+        ApplyResizeLimits();
         for (var i = 0; i < 3; i++)
         {
             _cur[i] = _tgt[i] = Color.FromArgb(PaletteAlphas[i], 0x0A, 0x0B, 0x0D);
@@ -91,6 +108,28 @@ public partial class MainWindow : Window
         AppSettings.Current.Changed += OnSettingsChanged;
     }
 
+    /// <summary>Garande que o widget está visível em algum monitor (clamp ao WorkArea).</summary>
+    private void EnsureVisibleOnScreen()
+    {
+        try
+        {
+            ScreenHelper.EnsureWindowIsVisible(this, AppSettings.Current.MonitorDeviceName);
+        }
+        catch { }
+    }
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        try
+        {
+            Dispatcher.Invoke(() =>
+            {
+                EnsureVisibleOnScreen();
+            });
+        }
+        catch { }
+    }
+
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyPalette();
@@ -99,7 +138,31 @@ public partial class MainWindow : Window
         {
             PositionWindow();
         }
+        else
+        {
+            // Mesmo com posição salva, garante que não ficou fora da tela
+            // (monitor desconectado, resolução mudou, taskbar maior etc.)
+            EnsureVisibleOnScreen();
+        }
         _isInitializingSize = false;
+
+        // Multi-monitor: quando o usuário pluga/despluga monitor ou muda
+        // resolução, o Windows dispara DisplaySettingsChanged. O widget se
+        // reclampa para o WorkArea do monitor atual e nunca some.
+        try
+        {
+            SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+            LocationChanged += (_, _) =>
+            {
+                // Enquanto arrasta, não salva a cada pixel (só no Closing),
+                // mas mantém o cache de monitor atualizado para clamp correto.
+            };
+            IsVisibleChanged += (_, args) =>
+            {
+                if (IsVisible) EnsureVisibleOnScreen();
+            };
+        }
+        catch { }
 
         LyricsToggleButton.Visibility = AppSettings.Current.LyricsEnabled
             ? Visibility.Visible
@@ -167,9 +230,25 @@ public partial class MainWindow : Window
 
     private void PositionWindow()
     {
-        var area = SystemParameters.WorkArea;
-        Left = area.Right - Width - 24;
-        Top = area.Top + 24;
+        try
+        {
+            var area = ScreenHelper.GetPrimaryWorkArea(this);
+            if (area.IsEmpty || area.Width <= 0 || area.Height <= 0)
+                area = SystemParameters.WorkArea;
+
+            Left = area.Right - Width - 24;
+            Top = area.Top + 24;
+
+            var clamped = ScreenHelper.GetClampedPosition(Left, Top, Width, Height, this, null);
+            Left = clamped.X;
+            Top = clamped.Y;
+        }
+        catch
+        {
+            var area = SystemParameters.WorkArea;
+            Left = area.Right - Width - 24;
+            Top = area.Top + 24;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -185,6 +264,7 @@ public partial class MainWindow : Window
 
         DesktopFx.HideFromAltTab(_hwnd);
         DesktopFx.RoundCorners(_hwnd, 14);
+        TryUpdateHotkeys();
     }
 
     /// <summary>
@@ -204,7 +284,7 @@ public partial class MainWindow : Window
         {
             // Conteúdo acompanha a largura da janela (o usuário redimensionou
             // pela borda): escala = nova largura / largura padrão de design.
-            ContentScale = Math.Clamp(ActualWidth / DefaultWidth, MinScale, MaxScale);
+            ContentScale = Math.Clamp(ActualWidth / DefaultWidth, MinScale, CurrentMaxScale);
         }
 
         // Painel de letras cresce junto com a altura extra da janela.
@@ -232,7 +312,8 @@ public partial class MainWindow : Window
                 if (!SameCover(bytes))
                 {
                     ++_hideToken; // cancela qualquer fade-out pendente
-                    ShowCover(bytes);
+                    var dir = _coverNavQueue.Count > 0 ? _coverNavQueue.Dequeue() : 1;
+                    ShowCover(bytes, dir);
                     ExtractPalette(bytes);
                 }
             }
@@ -255,13 +336,28 @@ public partial class MainWindow : Window
 
     private void RenderPosition()
     {
-        var position = _media.IsPlaying && _media.Duration > TimeSpan.Zero
-            ? _positionAtStamp + (DateTime.UtcNow - _positionStamp)
-            : _positionAtStamp;
+        TimeSpan position;
+        if (_isDraggingProgress)
+        {
+            // Durante o drag congela o relógio no ponto sob o cursor para não
+            // somar o elapsed e fazer a barra “pular” enquanto o mouse se move.
+            position = _positionAtStamp;
+        }
+        else
+        {
+            position = _media.IsPlaying && _media.Duration > TimeSpan.Zero
+                ? _positionAtStamp + (DateTime.UtcNow - _positionStamp)
+                : _positionAtStamp;
+        }
 
         if (position > _media.Duration && _media.Duration > TimeSpan.Zero)
         {
             position = _media.Duration;
+        }
+
+        if (position < TimeSpan.Zero)
+        {
+            position = TimeSpan.Zero;
         }
 
         CurrentTimeText.Text = FormatTime(position);
@@ -275,8 +371,24 @@ public partial class MainWindow : Window
 
     private double ProgressTrackWidth()
     {
+        // Track nomeado tem área de hit de 14px; a barra interna copia sua largura.
+        if (ProgressTrack is { ActualWidth: > 0 } track)
+        {
+            return track.ActualWidth;
+        }
+
         var parent = ProgressFill.Parent as FrameworkElement;
-        return parent?.ActualWidth ?? 0;
+        if (parent is { ActualWidth: > 0 })
+        {
+            return parent.ActualWidth;
+        }
+
+        if (parent is not null && VisualTreeHelper.GetParent(parent) is FrameworkElement grand && grand.ActualWidth > 0)
+        {
+            return grand.ActualWidth;
+        }
+
+        return 0;
     }
 
     private static string FormatTime(TimeSpan t) =>
@@ -301,8 +413,14 @@ public partial class MainWindow : Window
     private bool SameCover(byte[] bytes) =>
         _coverBytes is { } prev && prev.Length == bytes.Length && bytes.AsSpan().SequenceEqual(prev);
 
-    /// <summary>Capa nova desliza da direita; a antiga sai pela esquerda.</summary>
-    private void ShowCover(byte[] bytes)
+    private void EnqueueCoverDirection(int dir)
+    {
+        _coverNavQueue.Enqueue(dir);
+        if (_coverNavQueue.Count > 8) _coverNavQueue.Dequeue();
+    }
+
+    /// <summary>Capa nova desliza conforme a direção: 1=frente (entra da direita), -1=volta (entra da esquerda).</summary>
+    private void ShowCover(byte[] bytes, int direction = 1)
     {
         var visible = _coverLayer == 0 ? CoverImageA : CoverImageB;
         var incoming = _coverLayer == 0 ? CoverImageB : CoverImageA;
@@ -328,10 +446,12 @@ public partial class MainWindow : Window
         Panel.SetZIndex(visible, 5);
 
         incoming.Opacity = 0;
-        Animate(incomingX, TranslateTransform.XProperty, 86, 0, 420);
+        var incomingFrom = 86 * direction;
+        var outgoingTo = -86 * direction;
+        Animate(incomingX, TranslateTransform.XProperty, incomingFrom, 0, 420);
         Animate(incoming, UIElement.OpacityProperty, 0, 1, 250);
 
-        Animate(visibleX, TranslateTransform.XProperty, 0, -86, 400);
+        Animate(visibleX, TranslateTransform.XProperty, 0, outgoingTo, 400);
         Animate(visible, UIElement.OpacityProperty, 1, 0, 300);
 
         _coverLayer = _coverLayer == 0 ? 1 : 0;
@@ -753,6 +873,91 @@ public partial class MainWindow : Window
         LyricsScroll.BeginAnimation(UIElement.OpacityProperty, anim, HandoffBehavior.SnapshotAndReplace);
     }
 
+    // ------------------------------------------------- seek na barra de progresso (click + drag)
+
+    private async void ProgressTrack_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_media.Duration <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        _isDraggingProgress = true;
+        if (sender is FrameworkElement track)
+        {
+            track.CaptureMouse();
+        }
+
+        await SeekFromProgressTrackPointAsync(e.GetPosition(ProgressTrack)).ConfigureAwait(true);
+        e.Handled = true;
+    }
+
+    private async void ProgressTrack_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_isDraggingProgress)
+        {
+            return;
+        }
+
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            _isDraggingProgress = false;
+            (sender as FrameworkElement)?.ReleaseMouseCapture();
+            return;
+        }
+
+        await SeekFromProgressTrackPointAsync(e.GetPosition(ProgressTrack)).ConfigureAwait(true);
+        e.Handled = true;
+    }
+
+    private async void ProgressTrack_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isDraggingProgress)
+        {
+            return;
+        }
+
+        _isDraggingProgress = false;
+        (sender as FrameworkElement)?.ReleaseMouseCapture();
+        await SeekFromProgressTrackPointAsync(e.GetPosition(ProgressTrack)).ConfigureAwait(true);
+        e.Handled = true;
+    }
+
+    private async Task SeekFromProgressTrackPointAsync(System.Windows.Point posInTrack)
+    {
+        var width = ProgressTrackWidth();
+        if (width <= 0 || _media.Duration <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        var ratio = Math.Clamp(posInTrack.X / width, 0, 1);
+        // Ticks evita erro de floating em durações > 1h
+        var target = TimeSpan.FromTicks((long)(_media.Duration.Ticks * ratio));
+
+        // Feedback imediato: move a barra e o relógio antes do SMTC responder
+        _positionAtStamp = target;
+        _positionStamp = DateTime.UtcNow;
+        Dispatcher.Invoke(RenderPosition);
+
+        var accepted = await _tracker.SeekAsync(target).ConfigureAwait(true);
+        if (!accepted)
+        {
+            Dispatcher.Invoke(FlashProgressSeekDenied);
+        }
+    }
+
+    private void FlashProgressSeekDenied()
+    {
+        // Pisca a barra como “negado” — mesmo padrão do painel de letras
+        var anim = new DoubleAnimation(0.35, TimeSpan.FromMilliseconds(100))
+        {
+            AutoReverse = true,
+            RepeatBehavior = new RepeatBehavior(2),
+        };
+        ProgressFill.BeginAnimation(UIElement.OpacityProperty, anim, HandoffBehavior.SnapshotAndReplace);
+    }
+
     /// <summary>
     /// Efeito spicy-lyrics: ativa em destaque, passadas apagadas, futuras
     /// visíveis. A linha ativa com marcações por palavra ganha o gradiente
@@ -954,6 +1159,8 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         ApplyBottomBehavior();
+        TryUpdateHotkeys();
+        ApplyResizeLimits();
 
         if (!AppSettings.Current.LyricsEnabled)
         {
@@ -995,6 +1202,39 @@ public partial class MainWindow : Window
         }
     }
 
+    // ------------------------------------------------- hotkeys globais
+    private void TryUpdateHotkeys()
+    {
+        var enabled = AppSettings.Current.HotkeysEnabled;
+        if (enabled)
+        {
+            if (_hwnd == IntPtr.Zero) return; // ainda sem HWND (OnSourceInitialized ainda não rodou)
+            _hotkeys ??= new HotkeyManager();
+            _hotkeys.Pressed -= OnHotkeyPressed;
+            _hotkeys.Pressed += OnHotkeyPressed;
+            _hotkeys.TryRegister(_hwnd);
+        }
+        else
+        {
+            _hotkeys?.Unregister();
+        }
+    }
+
+    private void OnHotkeyPressed(HotkeyAction action)
+    {
+        // Disparado via WM_HOTKEY na UI thread; delega ao MediaTracker (SMTC).
+        // Enfileira a direção antes do SMTC trocar de faixa para a capa animar pro lado certo.
+        if (action == HotkeyAction.Next) EnqueueCoverDirection(1);
+        else if (action == HotkeyAction.Previous) EnqueueCoverDirection(-1);
+        _ = action switch
+        {
+            HotkeyAction.PlayPause => _tracker.TogglePlayPauseAsync(),
+            HotkeyAction.Next => _tracker.NextAsync(),
+            HotkeyAction.Previous => _tracker.PreviousAsync(),
+            _ => Task.CompletedTask,
+        };
+    }
+
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (_locked)
@@ -1002,10 +1242,32 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.OriginalSource is DependencyObject { } source &&
-            FindAncestor<Button>(source) is not null)
+        if (_isDraggingProgress)
         {
             return;
+        }
+
+        if (e.OriginalSource is DependencyObject source)
+        {
+            if (FindAncestor<Button>(source) is not null)
+            {
+                return;
+            }
+
+            // Não arrastar a janela quando o clique foi na barra de progresso
+            if (ProgressTrack is not null)
+            {
+                var cur = source;
+                while (cur is not null)
+                {
+                    if (ReferenceEquals(cur, ProgressTrack))
+                    {
+                        return;
+                    }
+
+                    cur = VisualTreeHelper.GetParent(cur);
+                }
+            }
         }
         DragMove();
     }
@@ -1043,6 +1305,30 @@ public partial class MainWindow : Window
         settings.Scale = ContentScale;
         settings.LyricsExpanded = _lyricsExpanded;
         settings.Locked = _locked;
+
+        // Multi-monitor: salva o DeviceName do monitor atual e a posição
+        // específica por tela. Assim, ao trocar de monitor ou desconectar,
+        // o widget volta para o mesmo lugar na tela correspondente e nunca
+        // some fora do WorkArea.
+        try
+        {
+            var deviceName = ScreenHelper.GetDeviceNameForWindow(this)
+                          ?? ScreenHelper.GetDeviceNameForPoint(Left + Width / 2, Top + Height / 2, this);
+            settings.MonitorDeviceName = deviceName;
+            if (!string.IsNullOrWhiteSpace(deviceName))
+            {
+                settings.MonitorPositions ??= new Dictionary<string, AppSettings.MonitorPlacement>();
+                settings.MonitorPositions[deviceName] = new AppSettings.MonitorPlacement
+                {
+                    Left = Left,
+                    Top = Top,
+                    Width = Width,
+                    Height = Math.Max(DefaultHeight * ContentScale, savedHeight)
+                };
+            }
+        }
+        catch { }
+
         settings.Save();
     }
 
@@ -1054,15 +1340,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        Left = settings.Left;
-        Top = settings.Top;
-        _locked = settings.Locked;
+        // Garante que MaxWidth/MaxHeight reflitam o toggle lembrado antes de clampar
+        ApplyResizeLimits();
 
         // Tamanho personalizado pelo usuário (resize pela borda).
+        // Faz antes de Left/Top para o clamp usar o tamanho correto.
         if (settings is { Width: > 0, Height: > 0 })
         {
-            var w = Math.Clamp(settings.Width, MinWidth, MaxWidth);
-            var h = Math.Clamp(settings.Height, MinHeight, MaxHeight);
+            var w = Math.Clamp(settings.Width, MinWidth, CurrentMaxWidth);
+            var h = Math.Clamp(settings.Height, MinHeight, CurrentMaxHeight);
             if (Math.Abs(w - DefaultWidth) > 0.5 || Math.Abs(h - DefaultHeight) > 0.5)
             {
                 Width = w;
@@ -1072,8 +1358,45 @@ public partial class MainWindow : Window
 
         if (settings.Scale > 0)
         {
-            ContentScale = Math.Clamp(settings.Scale, MinScale, MaxScale);
+            ContentScale = Math.Clamp(settings.Scale, MinScale, CurrentMaxScale);
         }
+
+        // Restaura posição: tenta primeiro a posição salva por monitor
+        // (MonitorPositions[DeviceName]), caindo para Left/Top legado.
+        // Depois faz clamp ao WorkArea do monitor correto para não sumir.
+        var preferredDevice = settings.MonitorDeviceName;
+        var restoredPerMonitor = false;
+        if (!string.IsNullOrWhiteSpace(preferredDevice)
+            && settings.MonitorPositions is not null
+            && settings.MonitorPositions.TryGetValue(preferredDevice, out var placement))
+        {
+            Left = placement.Left;
+            Top = placement.Top;
+            if (placement.Width > 0 && placement.Height > 0
+                && (settings.Width <= 0 || settings.Height <= 0))
+            {
+                Width = Math.Clamp(placement.Width, MinWidth, CurrentMaxWidth);
+                Height = Math.Clamp(placement.Height, MinHeight, CurrentMaxHeight);
+            }
+            restoredPerMonitor = true;
+        }
+
+        if (!restoredPerMonitor)
+        {
+            Left = settings.Left;
+            Top = settings.Top;
+        }
+        _locked = settings.Locked;
+
+        // Clamp obrigatório: garante que Left/Top + Width/Height estejam
+        // totalmente dentro do WorkArea (sem ficar sob taskbar ou fora da tela).
+        try
+        {
+            var clamped = ScreenHelper.GetClampedPosition(Left, Top, Width, Height, this, preferredDevice);
+            Left = clamped.X;
+            Top = clamped.Y;
+        }
+        catch { }
 
         // Reabre o painel de letras se estava aberto quando fechou. A Height
         // salva já é a base (sem painel) — a expansão soma por cima dela.
@@ -1116,7 +1439,7 @@ public partial class MainWindow : Window
         get => _contentScale;
         set
         {
-            var v = Math.Clamp(value, MinScale, MaxScale);
+            var v = Math.Clamp(value, MinScale, CurrentMaxScale);
             if (Math.Abs(v - _contentScale) < 0.001)
             {
                 return;
@@ -1126,6 +1449,29 @@ public partial class MainWindow : Window
             Shell.LayoutTransform = new ScaleTransform(v, v);
             UpdateLayout();
         }
+    }
+
+    /// <summary>
+    /// Aplica os limites de janela/escala conforme o toggle ExtendedResizeEnabled.
+    /// Dormindo = 900×600 / 1.6×; Ativado = 1200×800 / 2.5× (opção B). Chamado no boot
+    /// e em AppSettings.Changed, e já reclampa a janela se ela ficou maior que o novo max.
+    /// </summary>
+    private void ApplyResizeLimits()
+    {
+        try
+        {
+            MaxWidth = CurrentMaxWidth;
+            MaxHeight = CurrentMaxHeight;
+            // Se desativou e a janela está maior que o limite dormindo, encolhe na hora
+            if (!AppSettings.Current.ExtendedResizeEnabled)
+            {
+                if (Width > CurrentMaxWidth) Width = CurrentMaxWidth;
+                if (Height > CurrentMaxHeight) Height = CurrentMaxHeight;
+                // Reclampa escala também (caso estivesse em 2.5×, volta pra 1.6×)
+                if (_contentScale > CurrentMaxScale) ContentScale = CurrentMaxScale;
+            }
+        }
+        catch { }
     }
 
     private static T? FindAncestor<T>(DependencyObject current) where T : DependencyObject
@@ -1141,14 +1487,20 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private async void PrevButton_Click(object sender, RoutedEventArgs e) =>
+    private async void PrevButton_Click(object sender, RoutedEventArgs e)
+    {
+        EnqueueCoverDirection(-1);
         await _tracker.PreviousAsync();
+    }
 
     private async void PlayButton_Click(object sender, RoutedEventArgs e) =>
         await _tracker.TogglePlayPauseAsync();
 
-    private async void NextButton_Click(object sender, RoutedEventArgs e) =>
+    private async void NextButton_Click(object sender, RoutedEventArgs e)
+    {
+        EnqueueCoverDirection(1);
         await _tracker.NextAsync();
+    }
 
     private void CloseButton_Click(object sender, MouseButtonEventArgs e)
     {
@@ -1163,6 +1515,11 @@ public partial class MainWindow : Window
             e.Cancel = true;
             Hide();
             app.NotifyHidden();
+            return;
         }
+        // Saída real: libera RegisterHotKey e evento de monitor para não ficar "preso" no sistema.
+        try { SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged; } catch { }
+        try { _hotkeys?.Dispose(); } catch { }
+        _hotkeys = null;
     }
 }

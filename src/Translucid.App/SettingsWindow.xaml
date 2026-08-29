@@ -88,7 +88,7 @@
                               Checked="BottomToggle_Changed" Unchecked="BottomToggle_Changed"/>
             </Grid>
 
-            <Grid>
+            <Grid Margin="0,0,0,14">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -100,6 +100,34 @@
                 </StackPanel>
                 <ToggleButton x:Name="LyricsToggle" Grid.Column="1" Style="{StaticResource Switch}"
                               Checked="LyricsToggle_Changed" Unchecked="LyricsToggle_Changed"/>
+            </Grid>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Atalhos globais" FontSize="12.5" Foreground="White"/>
+                    <TextBlock Text="Ctrl+Alt+P play/pause  •  N próxima  •  B anterior" FontSize="10.5"
+                               Foreground="#90FFFFFF" Margin="0,2,0,0"/>
+                </StackPanel>
+                <ToggleButton x:Name="HotkeysToggle" Grid.Column="1" Style="{StaticResource Switch}"
+                              Checked="HotkeysToggle_Changed" Unchecked="HotkeysToggle_Changed"/>
+            </Grid>
+
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Redimensionamento estendido" FontSize="12.5" Foreground="White"/>
+                    <TextBlock Text="Ativa opção B: até 1200×800 e escala 2.5× (off dorme em 900×600)" FontSize="10.5"
+                               Foreground="#90FFFFFF" Margin="0,2,0,0"/>
+                </StackPanel>
+                <ToggleButton x:Name="ExtendedResizeToggle" Grid.Column="1" Style="{StaticResource Switch}"
+                              Checked="ExtendedResizeToggle_Changed" Unchecked="ExtendedResizeToggle_Changed"/>
             </Grid>
         </StackPanel>
     </Border>

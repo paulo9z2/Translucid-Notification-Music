@@ -8,6 +8,9 @@ namespace Translucid.Core;
 /// Configurações persistentes do widget: posição, travas e preferências,
 /// salvas em %LOCALAPPDATA%\Translucid\ui.json. O autostart vive no registro
 /// (HKCU Run), igual aos apps normais do Windows.
+/// Multi-monitor: salva o DeviceName do monitor onde o widget estava e um
+/// dicionário de posições por tela. Ao carregar, valida se o monitor ainda
+/// existe e faz clamp ao WorkArea para o widget nunca sumir.
 /// </summary>
 public sealed class AppSettings
 {
@@ -36,11 +39,40 @@ public sealed class AppSettings
     public bool Locked { get; set; } = true;
     public bool LyricsEnabled { get; set; }
 
+    /// <summary>Quando true, libera o resize estendido (opção B): até 1200×800 com escala 2.5×. Quando false, "dorme" nos limites padrão 900×600 / 1.6×. Persistido em ui.json.</summary>
+    public bool ExtendedResizeEnabled { get; set; } = false;
+
+    /// <summary>Ativa os atalhos globais (Ctrl+Alt+P/N/B) via RegisterHotKey.</summary>
+    public bool HotkeysEnabled { get; set; } = true;
+
     /// <summary>
     /// Ativado: o widget fica sempre atrás de todas as janelas (camada de
     /// fundo). Desativado: comportamento normal de uma janela.
     /// </summary>
     public bool AlwaysOnBottom { get; set; } = true;
+
+    /// <summary>
+    /// DeviceName do monitor onde o widget foi salvo por último
+    /// (ex: \\.\DISPLAY1). Usado para restaurar na tela correta e para
+    /// detectar quando o monitor foi desconectado.
+    /// </summary>
+    public string? MonitorDeviceName { get; set; }
+
+    /// <summary>
+    /// Posição salva por monitor. Chave = DeviceName; valor = bounds salvos.
+    /// Mantém memória de onde o widget estava em cada tela, então ao
+    /// reconectar um monitor ele volta para o mesmo lugar.
+    /// </summary>
+    public Dictionary<string, MonitorPlacement>? MonitorPositions { get; set; }
+
+    /// <summary>Posição de janela associada a um monitor específico.</summary>
+    public sealed class MonitorPlacement
+    {
+        public double Left { get; set; }
+        public double Top { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+    }
 
     /// <summary>True quando já existia um json salvo com posição.</summary>
     public bool HasSavedPosition { get; private set; }
@@ -111,6 +143,7 @@ public sealed class AppSettings
                 if (settings is not null)
                 {
                     settings.HasSavedPosition = settings.Width > 0 || settings.Height > 0 || settings.Left != 0 || settings.Top != 0;
+                    settings.MonitorPositions ??= new Dictionary<string, MonitorPlacement>();
                     return settings;
                 }
             }
@@ -120,6 +153,9 @@ public sealed class AppSettings
             // corrompeu? ignora e usa o padrão
         }
 
-        return new AppSettings();
+        return new AppSettings
+        {
+            MonitorPositions = new Dictionary<string, MonitorPlacement>()
+        };
     }
 }
