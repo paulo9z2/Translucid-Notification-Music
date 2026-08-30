@@ -51,6 +51,15 @@ public sealed class AppSettings
     /// <summary>Ativa os atalhos globais (Ctrl+Alt+P/N/B) via RegisterHotKey.</summary>
     public bool HotkeysEnabled { get; set; } = true;
 
+    /// <summary>Atalho customizável para Pausar/Retomar (ex: "Ctrl + Alt + P"). Null/vazio = sem atalho.</summary>
+    public string? HotkeyPause { get; set; } = "Ctrl + Alt + P";
+
+    /// <summary>Atalho customizável para Próxima faixa.</summary>
+    public string? HotkeyNext { get; set; } = "Ctrl + Alt + N";
+
+    /// <summary>Atalho customizável para Faixa anterior.</summary>
+    public string? HotkeyPrev { get; set; } = "Ctrl + Alt + B";
+
     /// <summary>
     /// Ativado: o widget fica sempre atrás de todas as janelas (camada de
     /// fundo). Desativado: comportamento normal de uma janela.

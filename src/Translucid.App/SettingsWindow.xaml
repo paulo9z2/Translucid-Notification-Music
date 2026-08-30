@@ -116,6 +116,192 @@
                               Checked="HotkeysToggle_Changed" Unchecked="HotkeysToggle_Changed"/>
             </Grid>
 
+            <!-- Expander Atalhos Globais — spec docs/ux-expander-atalhos-globais.md -->
+            <Border x:Name="HotkeysExpanderRoot" Margin="0,6,0,0" CornerRadius="8" Background="Transparent">
+                <StackPanel>
+                    <!-- Header clicável — Border + Grid + TextBlock 'Personalizar atalhos' + chevron RotateTransform -->
+                    <Border x:Name="ExpanderHeader" Height="28" CornerRadius="8" Background="Transparent" Cursor="Hand"
+                            BorderBrush="Transparent" BorderThickness="1"
+                            MouseLeftButtonUp="ToggleHotkeysExpander_Click" KeyDown="ExpanderHeader_KeyDown" Focusable="True"
+                            ToolTip="Personalizar atalhos globais"
+                            AutomationProperties.Name="Personalizar atalhos, colapsado">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#14FFFFFF"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Personalizar atalhos" FontSize="11" Foreground="#CCFFFFFF"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                            <TextBlock x:Name="Chevron" Grid.Column="1" Text="&#xE70D;"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                       Foreground="#90FFFFFF" VerticalAlignment="Center"
+                                       Margin="0,0,6,0" RenderTransformOrigin="0.5,0.5">
+                                <TextBlock.RenderTransform>
+                                    <RotateTransform x:Name="ChevronRotate" Angle="0"/>
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
+
+                    <!-- Container colapsado — Border HotkeysExpanderPanel com ScaleY/Opacity animados -->
+                    <Border x:Name="HotkeysExpanderPanel" CornerRadius="8" Background="#0FFFFFFF"
+                            Padding="10,10,10,12" Margin="0,6,0,0"
+                            Visibility="Collapsed" Opacity="0" ClipToBounds="True">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="ExpanderContentScale" ScaleY="0"/>
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <Rectangle Height="1" Fill="#14FFFFFF" Margin="0,0,0,10"/>
+
+                            <!-- Row: Pausar / Retomar -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="26"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Pausar / Retomar" FontSize="10.5" Foreground="#CCFFFFFF"
+                                           VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Height="28" CornerRadius="6"
+                                        Background="#1AFFFFFF" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                        Margin="6,0,4,0">
+                                    <TextBox x:Name="HotkeyPauseBox" Background="Transparent" BorderThickness="0"
+                                             Foreground="White" FontSize="11.5" VerticalAlignment="Center"
+                                             Padding="8,0,6,0" IsReadOnly="True" Focusable="True"
+                                             ToolTip="Clique e pressione o novo atalho"
+                                             GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus"
+                                             PreviewKeyDown="HotkeyBox_PreviewKeyDown"
+                                             AutomationProperties.Name="Atalho Pausar Retomar"/>
+                                </Border>
+                                <Button x:Name="ClearPauseButton" Grid.Column="2" Width="22" Height="22" Content="&#xE711;"
+                                        FontFamily="Segoe MDL2 Assets" FontSize="8"
+                                        Foreground="#90FFFFFF" Background="Transparent" BorderThickness="0"
+                                        Cursor="Hand" ToolTip="Limpar atalho" Click="ClearPause_Click">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="11">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#1EFFFFFF"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#26FFFFFF"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </Grid>
+
+                            <!-- Row: Avançar -->
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="26"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Avançar" FontSize="10.5" Foreground="#CCFFFFFF"
+                                           VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Height="28" CornerRadius="6"
+                                        Background="#1AFFFFFF" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                        Margin="6,0,4,0">
+                                    <TextBox x:Name="HotkeyNextBox" Background="Transparent" BorderThickness="0"
+                                             Foreground="White" FontSize="11.5" VerticalAlignment="Center"
+                                             Padding="8,0,6,0" IsReadOnly="True" Focusable="True"
+                                             ToolTip="Clique e pressione o novo atalho"
+                                             GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus"
+                                             PreviewKeyDown="HotkeyBox_PreviewKeyDown"
+                                             AutomationProperties.Name="Atalho Avançar"/>
+                                </Border>
+                                <Button x:Name="ClearNextButton" Grid.Column="2" Width="22" Height="22" Content="&#xE711;"
+                                        FontFamily="Segoe MDL2 Assets" FontSize="8"
+                                        Foreground="#90FFFFFF" Background="Transparent" BorderThickness="0"
+                                        Cursor="Hand" ToolTip="Limpar atalho" Click="ClearNext_Click">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="11">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#1EFFFFFF"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#26FFFFFF"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </Grid>
+
+                            <!-- Row: Voltar -->
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="26"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Voltar" FontSize="10.5" Foreground="#CCFFFFFF"
+                                           VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Height="28" CornerRadius="6"
+                                        Background="#1AFFFFFF" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                        Margin="6,0,4,0">
+                                    <TextBox x:Name="HotkeyPrevBox" Background="Transparent" BorderThickness="0"
+                                             Foreground="White" FontSize="11.5" VerticalAlignment="Center"
+                                             Padding="8,0,6,0" IsReadOnly="True" Focusable="True"
+                                             ToolTip="Clique e pressione o novo atalho"
+                                             GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus"
+                                             PreviewKeyDown="HotkeyBox_PreviewKeyDown"
+                                             AutomationProperties.Name="Atalho Voltar"/>
+                                </Border>
+                                <Button x:Name="ClearPrevButton" Grid.Column="2" Width="22" Height="22" Content="&#xE711;"
+                                        FontFamily="Segoe MDL2 Assets" FontSize="8"
+                                        Foreground="#90FFFFFF" Background="Transparent" BorderThickness="0"
+                                        Cursor="Hand" ToolTip="Limpar atalho" Click="ClearPrev_Click">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="11">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#1EFFFFFF"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#26FFFFFF"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </Grid>
+
+                            <TextBlock Text="Dica: clique no campo e pressione o novo atalho. Esc cancela."
+                                       FontSize="9.5" Foreground="#66FFFFFF" Margin="0,10,0,0"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
             <Grid Margin="0,14,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

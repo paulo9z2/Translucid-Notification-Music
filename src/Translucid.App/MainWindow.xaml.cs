@@ -1254,7 +1254,17 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         ApplyBottomBehavior();
-        TryUpdateHotkeys();
+        // Hotkeys globais: recarrega bindings custom (ParseHotkey) com fallback e thread-safety
+        if (_hotkeys is not null)
+        {
+            try { _hotkeys.Reload(); } catch { /* fallback abaixo */ }
+            if (!_hotkeys.IsRegistered && AppSettings.Current.HotkeysEnabled && _hwnd != IntPtr.Zero)
+                TryUpdateHotkeys();
+        }
+        else
+        {
+            TryUpdateHotkeys();
+        }
         ApplyResizeLimits();
         // ponte Spicetify: liga/desliga sem restart
         try
