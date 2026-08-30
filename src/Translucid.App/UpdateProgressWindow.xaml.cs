@@ -8,9 +8,8 @@ using Translucid.Core;
 namespace Translucid.App;
 
 /// <summary>
-/// Janela de progresso do update: card escuro com barra pill amarela,
-/// velocidade de download e bytes recebidos/total — espelha a referência
-/// "Baixando Atualização" do NVIDIA App.
+/// Janela de progresso do update: card escuro com barra pill azul (#5CB8FF),
+/// velocidade e bytes — tema igual ao widget (acrylic + borda translúcida).
 /// </summary>
 public partial class UpdateProgressWindow : Window
 {

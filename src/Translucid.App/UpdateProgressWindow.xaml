@@ -14,32 +14,32 @@
     </WindowChrome.WindowChrome>
     <Grid>
         <!-- sombra -->
-        <Border CornerRadius="12" Background="#40000000" Margin="4"
+        <Border CornerRadius="12" Background="#30000000" Margin="4"
                 Effect="{StaticResource DropShadow}">
-            <Border CornerRadius="12" Background="#F2191919">
+            <Border CornerRadius="12" Background="#F2191919" BorderBrush="#26FFFFFF" BorderThickness="1">
                 <StackPanel Margin="20,16,20,14">
 
                     <!-- Título: ícone + texto -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock x:Name="TitleIcon" Text="&#xE896;" FontFamily="Segoe MDL2 Assets"
-                                   FontSize="15" Foreground="#FFCD00" VerticalAlignment="Center"/>
+                                   FontSize="15" Foreground="#5CB8FF" VerticalAlignment="Center"/>
                         <TextBlock x:Name="TitleText" Text="Baixando atualização" FontSize="14.5"
                                    FontWeight="SemiBold" Foreground="White"
                                    VerticalAlignment="Center" Margin="10,0,0,0"/>
                         <TextBlock x:Name="TagText" Text="" FontSize="11.5" FontWeight="SemiBold"
-                                   Foreground="#FFCD00" VerticalAlignment="Center" Margin="8,1,0,0"/>
+                                   Foreground="#5CB8FF" VerticalAlignment="Center" Margin="8,1,0,0"/>
                     </StackPanel>
 
-                    <!-- Barra de progresso pill (trilho #333333 + fill #FFCD00) -->
+                    <!-- Barra de progresso pill (trilho #26FFFFFF + fill #5CB8FF) -->
                     <Border x:Name="BarTrack" Height="9" CornerRadius="4.5"
-                            Background="#333333" Margin="0,18,0,0">
+                            Background="#26FFFFFF" Margin="0,18,0,0">
                         <Grid>
                             <Border x:Name="BarFill" HorizontalAlignment="Left"
-                                    CornerRadius="4.5" Width="0" Background="#FFCD00"/>
+                                    CornerRadius="4.5" Width="0" Background="#5CB8FF"/>
                             <!-- indeterminado: pulso deslizante -->
                             <Canvas x:Name="IndeterminateHost" Visibility="Collapsed">
                                 <Border Canvas.Left="-60" Canvas.Top="0" Width="60" Height="9"
-                                        CornerRadius="4.5" Background="#FFCD00" Opacity="0.85"
+                                        CornerRadius="4.5" Background="#5CB8FF" Opacity="0.85"
                                         x:Name="PulseBlock"/>
                             </Canvas>
                         </Grid>
