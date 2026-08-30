@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
         LyricsToggle.IsChecked = AppSettings.Current.LyricsEnabled;
         HotkeysToggle.IsChecked = AppSettings.Current.HotkeysEnabled;
         ExtendedResizeToggle.IsChecked = AppSettings.Current.ExtendedResizeEnabled;
+        SpicetifyBridgeToggle.IsChecked = AppSettings.Current.SpicetifyBridgeEnabled;
         Closed += (_, _) => _instance = null;
         _initializing = false;
     }
@@ -158,6 +159,16 @@ public partial class SettingsWindow : Window
         if (sender is System.Windows.Controls.Primitives.ToggleButton toggle)
         {
             AppSettings.Current.ExtendedResizeEnabled = toggle.IsChecked == true;
+            AppSettings.Current.Save();
+        }
+    }
+
+    private void SpicetifyBridgeToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_initializing) return;
+        if (sender is System.Windows.Controls.Primitives.ToggleButton toggle)
+        {
+            AppSettings.Current.SpicetifyBridgeEnabled = toggle.IsChecked == true;
             AppSettings.Current.Save();
         }
     }

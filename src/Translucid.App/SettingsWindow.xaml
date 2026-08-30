@@ -129,6 +129,26 @@
                 <ToggleButton x:Name="ExtendedResizeToggle" Grid.Column="1" Style="{StaticResource Switch}"
                               Checked="ExtendedResizeToggle_Changed" Unchecked="ExtendedResizeToggle_Changed"/>
             </Grid>
+
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Ponte Spicetify" FontSize="12.5" Foreground="White" VerticalAlignment="Center"/>
+                        <Ellipse Width="7" Height="7" Fill="#4CAF50" Margin="6,2,0,0" VerticalAlignment="Center" Opacity="0.95"/>
+                        <TextBlock Text="  Fase 1" Foreground="#90FFFFFF" FontSize="10.5" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="Spotify com Beautiful Lyrics → letra ao vivo no widget" FontSize="10.5"
+                               Foreground="#90FFFFFF" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    <TextBlock Text="Requer extension translucid-bridge.js (off = LRCLIB)" FontSize="9.5"
+                               Foreground="#66FFFFFF" Margin="0,1,0,0"/>
+                </StackPanel>
+                <ToggleButton x:Name="SpicetifyBridgeToggle" Grid.Column="1" Style="{StaticResource Switch}"
+                              Checked="SpicetifyBridgeToggle_Changed" Unchecked="SpicetifyBridgeToggle_Changed"/>
+            </Grid>
         </StackPanel>
     </Border>
 </Window>

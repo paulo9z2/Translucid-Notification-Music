@@ -42,6 +42,12 @@ public sealed class AppSettings
     /// <summary>Quando true, libera o resize estendido (opção B): até 1200×800 com escala 2.5×. Quando false, "dorme" nos limites padrão 900×600 / 1.6×. Persistido em ui.json.</summary>
     public bool ExtendedResizeEnabled { get; set; } = false;
 
+    /// <summary>Quando true, ativa a ponte Spicetify (Fase 1 — método A): extension translucid-bridge.js no Spotify envia letras/estado via WebSocket localhost → SpicetifyBridge.cs. Off = dormindo, usa só LRCLIB.</summary>
+    public bool SpicetifyBridgeEnabled { get; set; } = false;
+
+    /// <summary>Porta do WebSocket da ponte Spicetify (padrão 4389). Alterável via ui.json manualmente.</summary>
+    public int SpicetifyBridgePort { get; set; } = 4389;
+
     /// <summary>Ativa os atalhos globais (Ctrl+Alt+P/N/B) via RegisterHotKey.</summary>
     public bool HotkeysEnabled { get; set; } = true;
 

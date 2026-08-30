@@ -47,6 +47,10 @@ public partial class MainWindow : Window
     private IntPtr _hwnd;
     private HotkeyManager? _hotkeys;
 
+    // Fase 1 — ponte Spicetify (método A): JS no Spotify → WS localhost → WPF
+    private readonly SpicetifyBridge _spicetifyBridge = new();
+    private long _spicetifySeq;
+
     private MediaUpdate _media = MediaUpdate.Idle;
     private DateTime _positionStamp;
     private TimeSpan _positionAtStamp;
@@ -62,6 +66,9 @@ public partial class MainWindow : Window
     private long _hideToken;
     // fila de direções para a animação da capa: 1 = vai (entra da direita), -1 = volta (entra da esquerda)
     private readonly Queue<int> _coverNavQueue = new();
+    // Força animação da capa mesmo quando a capa não mudou (navegação manual).
+    // Evita que SameCover pule a animação quando Previous/Next foram clicados.
+    private bool _forceNextCoverAnimation;
 
     // paleta: gradiente lento na cor da capa
     private readonly Color[] _cur = new Color[3];
@@ -106,6 +113,8 @@ public partial class MainWindow : Window
         Closing += (_, _) => SaveSettings();
         Closing += Window_Closing;
         AppSettings.Current.Changed += OnSettingsChanged;
+        _spicetifyBridge.LyricsReceived += OnSpicetifyLyricsReceived;
+        _spicetifyBridge.ConnectionChanged += OnSpicetifyConnectionChanged;
     }
 
     /// <summary>Garande que o widget está visível em algum monitor (clamp ao WorkArea).</summary>
@@ -172,6 +181,7 @@ public partial class MainWindow : Window
         _tracker.Updated += OnMediaUpdated;
         await _tracker.StartAsync();
         _tick.Start();
+        InitSpicetifyBridge();
         _ = CheckForUpdatesAsync();
     }
 
@@ -309,7 +319,9 @@ public partial class MainWindow : Window
             var bytes = update.Thumbnail;
             if (bytes is { Length: > 0 })
             {
-                if (!SameCover(bytes))
+                var forceAnim = _forceNextCoverAnimation;
+                _forceNextCoverAnimation = false;
+                if (forceAnim || !SameCover(bytes))
                 {
                     ++_hideToken; // cancela qualquer fade-out pendente
                     var dir = _coverNavQueue.Count > 0 ? _coverNavQueue.Dequeue() : 1;
@@ -675,6 +687,89 @@ public partial class MainWindow : Window
     }
 
     // ------------------------------------------------------------- letras
+
+    private void InitSpicetifyBridge()
+    {
+        try
+        {
+            _spicetifyBridge.StartIfEnabled();
+            if (_spicetifyBridge.IsEnabled)
+                SetLyricsStatus(_spicetifyBridge.IsConnected ? "Spicetify conectado — aguardando letra…" : "Conectando à ponte Spicetify…");
+        }
+        catch { }
+    }
+
+    private void OnSpicetifyConnectionChanged(bool connected)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            // dot sutil na UI: usa o pill de update como indicador quando não há update
+            try
+            {
+                if (!connected && AppSettings.Current.SpicetifyBridgeEnabled && AppSettings.Current.LyricsEnabled && _lyrics is null)
+                    SetLyricsStatus("Ponte Spicetify aguardando Spotify… (fallback LRCLIB ativo)");
+            }
+            catch { }
+        });
+    }
+
+    private void OnSpicetifyLyricsReceived(LyricLine[] lines, SpicetifyLyricPayload payload)
+    {
+        var seq = ++_spicetifySeq;
+        Dispatcher.Invoke(() =>
+        {
+            if (!AppSettings.Current.LyricsEnabled) return;
+            if (!AppSettings.Current.SpicetifyBridgeEnabled) return;
+            // valida se ainda é a faixa atual — se o SMTC já trocou, ignora payload antigo
+            if (!string.IsNullOrWhiteSpace(payload.Track) && !string.IsNullOrWhiteSpace(_media.Title))
+            {
+                // tolerante: compara case-insensitive, sem acento
+                if (!payload.Track.Equals(_media.Title, StringComparison.OrdinalIgnoreCase) &&
+                    !payload.Artist.Equals(_media.Artist, StringComparison.OrdinalIgnoreCase))
+                {
+                    // ainda aceita, mas marca como nova chave para evitar conflito com LRCLIB token
+                }
+            }
+            // ponte ganha do LRCLIB: invalida token LRCLIB e injeta direto
+            ++_lyricsToken;
+            _lyricsKey = $"{payload.Track}\u0001{payload.Artist}\u0001spicetify:{seq}";
+            _lyrics = lines;
+            _lyricsIndex = -1;
+            // se duration veio, ajusta posição local para sync exato
+            if (payload.DurationMs > 0)
+            {
+                // não sobrescreve Duration do SMTC, só usa para progress local se SMTC estiver sem Duration
+                if (_media.Duration <= TimeSpan.Zero)
+                {
+                    _media = new MediaUpdate
+                    {
+                        Title = _media.Title, Artist = _media.Artist, Album = _media.Album, AppName = _media.AppName,
+                        AppProcessName = _media.AppProcessName, Thumbnail = _media.Thumbnail,
+                        Position = TimeSpan.FromMilliseconds(payload.PositionMs),
+                        Duration = TimeSpan.FromMilliseconds(payload.DurationMs),
+                        IsPlaying = payload.IsPlaying, CanNext = _media.CanNext, CanPrevious = _media.CanPrevious, CanPlayPause = _media.CanPlayPause
+                    };
+                    _positionAtStamp = TimeSpan.FromMilliseconds(payload.PositionMs);
+                    _positionStamp = DateTime.UtcNow;
+                }
+                else if (payload.IsPlaying)
+                {
+                    // corrige drift: ponte sabe a posição exata do Spotify (ms)
+                    _positionAtStamp = TimeSpan.FromMilliseconds(payload.PositionMs);
+                    _positionStamp = DateTime.UtcNow;
+                }
+            }
+            ShowLyricsContent();
+            SyncLyrics();
+            // se a extension já mandou activeLine/progress, aplica imediatamente
+            if (payload.ActiveLine >= 0 && payload.ActiveLine < lines.Length)
+            {
+                _lyricsIndex = payload.ActiveLine;
+                StyleLyricsLines(lines, payload.ActiveLine);
+                CenterActiveLyric();
+            }
+        });
+    }
 
     private void MaybeFetchLyrics(MediaUpdate update)
     {
@@ -1161,6 +1256,13 @@ public partial class MainWindow : Window
         ApplyBottomBehavior();
         TryUpdateHotkeys();
         ApplyResizeLimits();
+        // ponte Spicetify: liga/desliga sem restart
+        try
+        {
+            if (AppSettings.Current.SpicetifyBridgeEnabled) _spicetifyBridge.Start();
+            else _spicetifyBridge.Stop();
+        }
+        catch { }
 
         if (!AppSettings.Current.LyricsEnabled)
         {
@@ -1223,9 +1325,17 @@ public partial class MainWindow : Window
     private void OnHotkeyPressed(HotkeyAction action)
     {
         // Disparado via WM_HOTKEY na UI thread; delega ao MediaTracker (SMTC).
-        // Enfileira a direção antes do SMTC trocar de faixa para a capa animar pro lado certo.
-        if (action == HotkeyAction.Next) EnqueueCoverDirection(1);
-        else if (action == HotkeyAction.Previous) EnqueueCoverDirection(-1);
+        // Enfileira a direção e força animação da capa antes do SMTC trocar de faixa.
+        if (action == HotkeyAction.Next)
+        {
+            _forceNextCoverAnimation = true;
+            EnqueueCoverDirection(1);
+        }
+        else if (action == HotkeyAction.Previous)
+        {
+            _forceNextCoverAnimation = true;
+            EnqueueCoverDirection(-1);
+        }
         _ = action switch
         {
             HotkeyAction.PlayPause => _tracker.TogglePlayPauseAsync(),
@@ -1489,6 +1599,7 @@ public partial class MainWindow : Window
 
     private async void PrevButton_Click(object sender, RoutedEventArgs e)
     {
+        _forceNextCoverAnimation = true;
         EnqueueCoverDirection(-1);
         await _tracker.PreviousAsync();
     }
@@ -1498,6 +1609,7 @@ public partial class MainWindow : Window
 
     private async void NextButton_Click(object sender, RoutedEventArgs e)
     {
+        _forceNextCoverAnimation = true;
         EnqueueCoverDirection(1);
         await _tracker.NextAsync();
     }
@@ -1517,9 +1629,10 @@ public partial class MainWindow : Window
             app.NotifyHidden();
             return;
         }
-        // Saída real: libera RegisterHotKey e evento de monitor para não ficar "preso" no sistema.
+        // Saída real: libera RegisterHotKey, SpicetifyBridge e evento de monitor para não ficar "preso" no sistema.
         try { SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged; } catch { }
         try { _hotkeys?.Dispose(); } catch { }
         _hotkeys = null;
+        try { _spicetifyBridge.Dispose(); } catch { }
     }
 }
